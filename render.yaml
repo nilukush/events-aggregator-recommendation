@@ -1,14 +1,15 @@
 # Render Blueprint for EventNexus Background Worker
-# This defines a Cron Worker that runs periodically to ingest events
+# This defines a Cron Job that runs periodically to ingest events
 
 services:
-  # Background worker for event ingestion
-  - type: worker
-    name: eventnexus-worker
-    env: node
-    region: singapore
+  # Cron job for event ingestion - runs every hour
+  - type: cron
+    name: event-ingestion-hourly
+    runtime: node
+    schedule: "0 * * * *"
     buildCommand: npm install
     startCommand: npm run worker
+    region: singapore
     envVars:
       - key: NODE_VERSION
         value: 20
@@ -26,11 +27,3 @@ services:
         value: 55.2708
       - key: RADIUS_KM
         value: 50
-
-# Render Cron Jobs for scheduled execution
-crons:
-  # Run event ingestion every hour
-  - name: event-ingestion-hourly
-    schedule: "0 * * * *"
-    command: npm run worker
-    service: eventnexus-worker
