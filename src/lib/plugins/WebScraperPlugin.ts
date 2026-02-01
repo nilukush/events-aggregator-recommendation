@@ -346,7 +346,7 @@ export abstract class WebScraperPlugin extends BaseEventSourcePlugin {
 
     // If we have filter coordinates and the parsed location doesn't have coordinates,
     // use the filter coordinates as the event location
-    if (filters.location?.lat && filters.location?.lng && !baseLocation.lat) {
+    if (filters && filters.location?.lat && filters.location?.lng && !baseLocation.lat) {
       return {
         ...baseLocation,
         lat: filters.location.lat,
