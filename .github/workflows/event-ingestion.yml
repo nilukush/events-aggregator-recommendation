@@ -1,0 +1,113 @@
+# EventNexus - Scheduled Event Ingestion
+# This workflow runs every hour to fetch events from all sources
+# and store them in the Supabase database.
+
+name: Event Ingestion
+
+on:
+  # Run every hour
+  schedule:
+    - cron: '0 * * * *'
+
+  # Allow manual trigger from GitHub Actions UI
+  workflow_dispatch:
+
+  # Optional: Run on push to main (for testing)
+  # push:
+  #   branches: [main]
+
+jobs:
+  ingest-events:
+    name: Fetch and Store Events
+    runs-on: ubuntu-latest
+
+    # Prevent multiple concurrent runs
+    concurrency:
+      group: event-ingestion
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Trigger event ingestion
+        run: |
+          INGEST_URL="${{ secrets.INGEST_URL }}"
+          CITY="${{ secrets.CITY }}"
+          LAT="${{ secrets.LAT }}"
+          LNG="${{ secrets.LNG }}"
+          RADIUS_KM="${{ secrets.RADIUS_KM }}"
+
+          # Build query parameters
+          QUERY="?city=${CITY}&location_lat=${LAT}&location_lng=${LNG}&radius_km=${RADIUS_KM}"
+
+          echo "Triggering event ingestion from: ${INGEST_URL}${QUERY}"
+
+          RESPONSE=$(curl -s -X POST "${INGEST_URL}${QUERY}" \
+            -H "Content-Type: application/json" \
+            -w "\n%{http_code}")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY"
+
+          if [ "$HTTP_CODE" -eq 200 ]; then
+            echo "Event ingestion completed successfully"
+          else
+            echo "Event ingestion failed with status code: $HTTP_CODE"
+            exit 1
+          fi
+        env:
+          INGEST_URL: ${{ secrets.INGEST_URL }}
+          CITY: ${{ secrets.CITY }}
+          LAT: ${{ secrets.LAT }}
+          LNG: ${{ secrets.LNG }}
+          RADIUS_KM: ${{ secrets.RADIUS_KM }}
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "Event ingestion workflow completed at $(date)"
+          echo "Check the Vercel logs for more details"
+
+  # Fallback job that runs the worker directly if API fails
+  ingest-direct:
+    name: Direct Ingestion (Fallback)
+    runs-on: ubuntu-latest
+    if: failure()
+    needs: ingest-events
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run worker directly
+        run: npm run worker
+        env:
+          INGEST_URL: ${{ secrets.INGEST_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          CITY: ${{ secrets.CITY }}
+          LAT: ${{ secrets.LAT }}
+          LNG: ${{ secrets.LNG }}
+          RADIUS_KM: ${{ secrets.RADIUS_KM }}

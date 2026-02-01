@@ -1,12 +1,12 @@
 # Deployment Guide - EventNexus
 
-This guide covers deploying EventNexus to production using Vercel (frontend) and Render (background worker).
+This guide covers deploying EventNexus to production using Vercel (frontend) and GitHub Actions (scheduled event ingestion).
 
 ## Prerequisites
 
 1. A Supabase project with the database migrations applied
 2. A GitHub repository with the code
-3. Accounts on Vercel and Render
+3. A Vercel account
 
 ## Architecture
 
@@ -14,9 +14,10 @@ This guide covers deploying EventNexus to production using Vercel (frontend) and
   - Hosts the web application and API routes
   - URL: `https://events-aggregator-recommendation.vercel.app`
 
-- **Background Worker**: Render (Cron Worker)
-  - Periodically fetches events from sources and stores in database
-  - Runs every hour by default
+- **Scheduled Event Ingestion**: GitHub Actions (FREE)
+  - Runs every hour to fetch events from sources
+  - Calls the `/api/ingest` endpoint
+  - Unlimited free minutes for public repositories
 
 ## Environment Variables
 
@@ -27,17 +28,17 @@ This guide covers deploying EventNexus to production using Vercel (frontend) and
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL | `https://xxx.supabase.co` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase publishable key | `sb_publishable_xxx` |
 
-### Render (Background Worker)
+### GitHub Secrets (for Scheduled Ingestion)
 
-| Variable | Description | Example |
-|----------|-------------|---------|
+| Secret | Description | Example |
+|--------|-------------|---------|
 | `INGEST_URL` | URL of the ingest endpoint | `https://events-aggregator-recommendation.vercel.app/api/ingest` |
-| `SUPABASE_URL` | Supabase project URL | `https://xxx.supabase.co` |
-| `SUPABASE_ANON_KEY` | Supabase publishable key | `sb_publishable_xxx` |
 | `CITY` | Default city for events | `Dubai` |
 | `LAT` | Default latitude | `25.2048` |
 | `LNG` | Default longitude | `55.2708` |
 | `RADIUS_KM` | Search radius in km | `50` |
+| `SUPABASE_URL` | Supabase project URL (fallback) | `https://xxx.supabase.co` |
+| `SUPABASE_ANON_KEY` | Supabase publishable key (fallback) | `sb_publishable_xxx` |
 
 ## Deployment Steps
 
@@ -70,36 +71,40 @@ echo "https://your-project.supabase.co" | npx vercel env add NEXT_PUBLIC_SUPABAS
 echo "sb_publishable_your_key" | npx vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY production
 ```
 
-### 3. Deploy to Render
+### 3. Configure GitHub Actions for Scheduled Ingestion
 
-Option A: Using render.yaml (Blueprint)
+Since your repository is **public**, GitHub Actions provides **unlimited free minutes**!
 
-1. Go to https://dashboard.render.com/blueprints
-2. Connect your GitHub repository
-3. Review the configuration in `render.yaml`
-4. Add environment variables:
-   - `SUPABASE_URL`
-   - `SUPABASE_ANON_KEY`
-   - `INGEST_URL` (your Vercel deployment URL)
-5. Deploy
+#### Step 3.1: Add GitHub Secrets
 
-Option B: Manual Deployment
+1. Go to your GitHub repository
+2. Navigate to **Settings** → **Secrets and variables** → **Actions**
+3. Click **New repository secret** and add:
+   - `INGEST_URL`: `https://events-aggregator-recommendation.vercel.app/api/ingest`
+   - `CITY`: `Dubai`
+   - `LAT`: `25.2048`
+   - `LNG`: `55.2708`
+   - `RADIUS_KM`: `50`
 
-1. Go to https://dashboard.render.com
-2. Create a new "Cron Job"
-3. Connect your GitHub repository
-4. Configure:
-   - **Name**: `eventnexus-worker`
-   - **Region**: Singapore (or closest to your users)
-   - **Branch**: `main`
-   - **Runtime**: `Node 20`
-   - **Build Command**: `npm install`
-   - **Start Command**: `npm run worker`
-   - **Cron Schedule**: `0 * * * *` (every hour)
-5. Add environment variables (see table above)
-6. Deploy
+#### Step 3.2: Enable the Workflow
 
-### 4. Verify Deployment
+The workflow file is already at `.github/workflows/event-ingestion.yml`
+
+1. Go to **Actions** tab in your GitHub repository
+2. Click on **Event Ingestion** workflow
+3. Click **Enable workflow**
+
+The workflow will automatically run **every hour** at the top of the hour.
+
+### 4. Trigger a Manual Run (Optional)
+
+To test the workflow immediately:
+
+1. Go to **Actions** tab
+2. Click **Event Ingestion**
+3. Click **Run workflow** → **Run workflow**
+
+### 5. Verify Deployment
 
 Test the frontend:
 ```bash
@@ -121,8 +126,31 @@ Apply migrations in your Supabase SQL editor:
 ## Monitoring
 
 - **Vercel**: Check logs at https://vercel.com/dashboard
-- **Render**: Check logs at https://dashboard.render.com
+- **GitHub Actions**: Check workflow runs at https://github.com/nilukush/events-aggregator-recommendation/actions
 - **Supabase**: Monitor database at https://supabase.com/dashboard
+
+## Free Hosting Summary
+
+| Service | Tier | Cost | Limits |
+|---------|------|------|--------|
+| **Vercel** | Hobby | FREE | Sufficient for this project |
+| **GitHub Actions** | Public Repo | FREE | Unlimited minutes |
+| **Supabase** | Free Tier | FREE | 500MB database, 50K MAU |
+
+**Total Monthly Cost: $0**
+
+## Alternative: cron-job.org (External Service)
+
+If you prefer an even simpler approach, you can use [cron-job.org](https://cron-job.org/) which is completely free:
+
+1. Create an account at https://cron-job.org
+2. Create a new cron job
+3. Set URL to: `https://events-aggregator-recommendation.vercel.app/api/ingest?city=Dubai`
+4. Set execution to every hour
+5. Save
+
+**Pros:** No GitHub configuration needed
+**Cons:** External dependency, less logging
 
 ## Local Testing
 
@@ -151,11 +179,12 @@ npm run worker
 - Verify Supabase migrations have been applied
 - Check API endpoints are accessible
 
-### Worker Not Running
+### GitHub Actions Not Running
 
-- Verify Render cron schedule is correct
-- Check worker logs in Render dashboard
-- Ensure INGEST_URL points to correct Vercel deployment
+- Verify workflow is enabled in Actions tab
+- Check schedule syntax: `0 * * * *` (hourly)
+- Check GitHub Secrets are configured correctly
+- View workflow logs for detailed error messages
 
 ## Next Steps
 
