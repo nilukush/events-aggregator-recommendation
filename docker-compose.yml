@@ -1,0 +1,53 @@
+# EventNexus Docker Compose Configuration
+# Development environment with all services
+
+version: "3.8"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: eventnexus-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_SUPABASE_URL=${SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - EVENTBRITE_API_KEY=${EVENTBRITE_API_KEY}
+      - EVENTBRITE_OAUTH_TOKEN=${EVENTBRITE_OAUTH_TOKEN}
+      - MEETUP_API_KEY=${MEETUP_API_KEY}
+      - MEETUP_OAUTH_TOKEN=${MEETUP_OAUTH_TOKEN}
+      - LUMA_API_KEY=${LUMA_API_KEY}
+      - FRACTIONAL_DUBAI_API_KEY=${FRACTIONAL_DUBAI_API_KEY}
+    networks:
+      - eventnexus-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional: Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: eventnexus-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - app
+    networks:
+      - eventnexus-network
+
+networks:
+  eventnexus-network:
+    driver: bridge

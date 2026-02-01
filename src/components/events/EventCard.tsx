@@ -1,0 +1,217 @@
+/**
+ * Event Card Component
+ * Displays a single event with all relevant information
+ */
+
+"use client";
+
+import React from "react";
+import { formatDistanceToNow } from "date-fns";
+import { CalendarIcon, MapPinIcon, ClockIcon, BookmarkIcon } from "@heroicons/react/24/outline";
+import { BookmarkIcon as BookmarkSolidIcon } from "@heroicons/react/24/solid";
+import type { DbEvent } from "@/lib/db/schema";
+
+export interface EventCardProps {
+  event: {
+    id: string;
+    source_id: string;
+    external_id: string;
+    title: string;
+    description: string | null;
+    event_url: string;
+    image_url: string | null;
+    start_time: string;
+    end_time: string | null;
+    location_name: string | null;
+    location_lat: number | null;
+    location_lng: number | null;
+    is_virtual: boolean;
+    category: string | null;
+    tags: string[] | null;
+    is_bookmarked?: boolean;
+    is_hidden?: boolean;
+  };
+  onBookmark?: (eventId: string) => void;
+  onClick?: (eventId: string) => void;
+  showBookmark?: boolean;
+  showSource?: boolean;
+}
+
+export function EventCard({
+  event,
+  onBookmark,
+  onClick,
+  showBookmark = true,
+  showSource = false,
+}: EventCardProps) {
+  const eventDate = new Date(event.start_time);
+  const endDate = event.end_time ? new Date(event.end_time) : null;
+  const timeUntilEvent = formatDistanceToNow(eventDate, { addSuffix: true });
+
+  const formatEventTime = (date: Date) => {
+    return date.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+  };
+
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
+  const handleBookmarkClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onBookmark?.(event.id);
+  };
+
+  const handleCardClick = () => {
+    onClick?.(event.id);
+  };
+
+  return (
+    <div
+      onClick={handleCardClick}
+      className="bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-lg transition-shadow cursor-pointer overflow-hidden group"
+    >
+      {/* Event Image */}
+      {event.image_url ? (
+        <div className="relative h-48 overflow-hidden bg-gray-200 dark:bg-gray-700">
+          <img
+            src={event.image_url}
+            alt={event.title}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+          {showSource && (
+            <div className="absolute top-3 left-3">
+              <span className="px-2 py-1 bg-black/50 backdrop-blur-sm text-white text-xs font-medium rounded-full capitalize">
+                {event.source_id}
+              </span>
+            </div>
+          )}
+          {showBookmark && (
+            <button
+              onClick={handleBookmarkClick}
+              className="absolute top-3 right-3 p-2 rounded-full bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm hover:bg-white dark:hover:bg-gray-700 transition-colors"
+            >
+              {event.is_bookmarked ? (
+                <BookmarkSolidIcon className="h-5 w-5 text-blue-600" />
+              ) : (
+                <BookmarkIcon className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+              )}
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="relative h-48 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+          <span className="text-white text-6xl font-bold opacity-30">
+            {event.title.charAt(0)}
+          </span>
+          {showBookmark && (
+            <button
+              onClick={handleBookmarkClick}
+              className="absolute top-3 right-3 p-2 rounded-full bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm hover:bg-white dark:hover:bg-gray-700 transition-colors"
+            >
+              {event.is_bookmarked ? (
+                <BookmarkSolidIcon className="h-5 w-5 text-blue-600" />
+              ) : (
+                <BookmarkIcon className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+              )}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Event Content */}
+      <div className="p-4">
+        {/* Category Tag */}
+        {event.category && (
+          <div className="mb-2">
+            <span className="inline-block px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-medium rounded-full capitalize">
+              {event.category}
+            </span>
+          </div>
+        )}
+
+        {/* Title */}
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white line-clamp-2 mb-2">
+          {event.title}
+        </h3>
+
+        {/* Description */}
+        {event.description && (
+          <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2 mb-3">
+            {event.description}
+          </p>
+        )}
+
+        {/* Tags */}
+        {event.tags && event.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-3">
+            {event.tags.slice(0, 3).map((tag) => (
+              <span
+                key={tag}
+                className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 text-xs rounded-full"
+              >
+                #{tag}
+              </span>
+            ))}
+            {event.tags.length > 3 && (
+              <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 text-xs rounded-full">
+                +{event.tags.length - 3}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Event Details */}
+        <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
+          {/* Date and Time */}
+          <div className="flex items-center gap-2">
+            <CalendarIcon className="h-4 w-4" />
+            <span>{formatDate(eventDate)}</span>
+            <span>•</span>
+            <ClockIcon className="h-4 w-4" />
+            <span>
+              {formatEventTime(eventDate)}
+              {endDate && ` - ${formatEventTime(endDate)}`}
+            </span>
+          </div>
+
+          {/* Location */}
+          {event.location_name && (
+            <div className="flex items-center gap-2">
+              <MapPinIcon className="h-4 w-4" />
+              <span className="truncate">{event.location_name}</span>
+            </div>
+          )}
+
+          {/* Virtual Badge */}
+          {event.is_virtual && (
+            <div className="flex items-center gap-2">
+              <svg
+                className="h-4 w-4 text-purple-500"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74-4.436a1 1 0 011.986 0l.74 4.436a1 1 0 01.986-.836h3a1 1 0 011 1v10a1 1 0 01-1 1h-2a1 1 0 01-1-1v-2a1 1 0 00-1-1H7a1 1 0 00-1 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V3zM15 4H9v1h6V4zM9 8h6v1h-6V8zm0 2h6v1h-6v-1z" />
+              </svg>
+              <span className="text-purple-600 dark:text-purple-400 font-medium">
+                Virtual Event
+              </span>
+            </div>
+          )}
+
+          {/* Time until event */}
+          <div className="text-xs text-gray-500 dark:text-gray-500 pt-1">
+            {timeUntilEvent}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
