@@ -13,10 +13,11 @@ import { NextResponse, type NextRequest } from "next/server";
  */
 const publicRoutes = [
   "/",
-  "/auth/sign-in",
-  "/auth/sign-up",
+  "/auth/signin",
+  "/auth/signup",
   "/auth/reset-password",
   "/api/auth",
+  "/events",
 ];
 
 /**
@@ -136,14 +137,14 @@ export async function middleware(request: NextRequest) {
 
   // Handle protected routes - redirect to sign-in if not authenticated
   if (isProtectedRoute(pathname) && !isAuth) {
-    const signInUrl = new URL("/auth/sign-in", request.url);
+    const signInUrl = new URL("/auth/signin", request.url);
     signInUrl.searchParams.set("redirectTo", pathname);
     return NextResponse.redirect(signInUrl);
   }
 
-  // Redirect authenticated users away from auth pages
-  if (isAuth && (pathname.startsWith("/auth/sign-in") || pathname.startsWith("/auth/sign-up"))) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+  // Redirect authenticated users away from auth pages to home
+  if (isAuth && (pathname.startsWith("/auth/signin") || pathname.startsWith("/auth/signup"))) {
+    return NextResponse.redirect(new URL("/", request.url));
   }
 
   return response;

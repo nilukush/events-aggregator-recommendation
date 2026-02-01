@@ -46,12 +46,20 @@ export default function PreferencesPage() {
             Sign in to customize your event preferences and get personalized
             recommendations.
           </p>
-          <a
-            href="/auth/signin"
-            className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Sign In
-          </a>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <a
+              href="/auth/signin"
+              className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Sign In
+            </a>
+            <a
+              href="/auth/signup"
+              className="inline-flex items-center px-6 py-3 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            >
+              Sign Up
+            </a>
+          </div>
         </div>
       </main>
     );
