@@ -155,7 +155,6 @@ export default function RecommendationsPage() {
               <EventCard
                 key={event.id}
                 event={event}
-                showSource
                 showBookmark
               />
             ))}

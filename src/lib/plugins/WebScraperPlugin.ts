@@ -129,8 +129,8 @@ export abstract class WebScraperPlugin extends BaseEventSourcePlugin {
     // Parse events from HTML
     const parsedEvents = this.parseEvents($, filters);
 
-    // Normalize events
-    return this.normalizeEvents(parsedEvents);
+    // Normalize events with filter coordinates for location fallback
+    return this.normalizeEvents(parsedEvents, filters);
   }
 
   /**
@@ -174,20 +174,20 @@ export abstract class WebScraperPlugin extends BaseEventSourcePlugin {
   /**
    * Normalize parsed events to standard format
    */
-  protected normalizeEvents(parsedEvents: ParsedEvent[]): NormalizedEvent[] {
-    return parsedEvents.map((event) => this.normalizeEvent(event));
+  protected normalizeEvents(parsedEvents: ParsedEvent[], filters: EventFilters = {}): NormalizedEvent[] {
+    return parsedEvents.map((event) => this.normalizeEvent(event, filters));
   }
 
   /**
    * Normalize a single event
    */
-  protected normalizeEvent(event: ParsedEvent): NormalizedEvent {
+  protected normalizeEvent(event: ParsedEvent, filters?: EventFilters): NormalizedEvent {
     // Parse date/time to Date objects
     const startTime = event.startTime ? this.parseDateTimeToDate(event.startTime) : new Date();
     const endTime = event.endTime ? this.parseDateTimeToDate(event.endTime) : null;
 
     // Extract location details
-    const location = this.parseLocation(event.location);
+    const location = this.parseLocationWithFilters(event.location, filters);
 
     // Generate tags from category and event data
     const tags = this.generateTags(event);
@@ -332,6 +332,29 @@ export abstract class WebScraperPlugin extends BaseEventSourcePlugin {
       lng: undefined,
       isVirtual,
     };
+  }
+
+  /**
+   * Parse location with fallback to filter coordinates
+   * When scraping doesn't provide coordinates, use the search location
+   */
+  protected parseLocationWithFilters(
+    locationStr?: string,
+    filters?: EventFilters
+  ): NormalizedEvent["location"] {
+    const baseLocation = this.parseLocation(locationStr);
+
+    // If we have filter coordinates and the parsed location doesn't have coordinates,
+    // use the filter coordinates as the event location
+    if (filters.location?.lat && filters.location?.lng && !baseLocation.lat) {
+      return {
+        ...baseLocation,
+        lat: filters.location.lat,
+        lng: filters.location.lng,
+      };
+    }
+
+    return baseLocation;
   }
 
   /**

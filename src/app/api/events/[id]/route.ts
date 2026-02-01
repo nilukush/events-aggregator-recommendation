@@ -9,7 +9,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getServerUser } from "@/lib/auth/server-client";
-import { getEventById } from "@/lib/db/queries";
+import { supabase } from "@/lib/supabase";
+import { TABLES } from "@/lib/db/schema";
 import {
   recordInteraction,
   isEventBookmarked,
@@ -18,11 +19,13 @@ import {
   unhideEvent,
 } from "@/lib/services/UserPreferencesService";
 import type { ApiResponse, EventWithInteractions, EventInteractionRequest } from "@/lib/api/types";
+import type { DbEvent } from "@/lib/db/schema";
 
 /**
  * GET /api/events/:id
  *
  * Get a single event by ID with user interaction state
+ * Now includes source_name from event_sources join
  */
 export async function GET(
   request: NextRequest,
@@ -32,9 +35,14 @@ export async function GET(
     const { id } = await params;
     const user = await getServerUser();
 
-    const event = await getEventById(id);
+    // Fetch event with source data
+    const { data: eventData, error } = await supabase
+      .from(TABLES.EVENTS)
+      .select("*, event_sources(name, slug)")
+      .eq("id", id)
+      .single();
 
-    if (!event) {
+    if (error || !eventData) {
       const errorResponse: ApiResponse = {
         success: false,
         error: "Event not found",
@@ -42,8 +50,21 @@ export async function GET(
       return NextResponse.json(errorResponse, { status: 404 });
     }
 
+    // Type for joined data
+    type EventWithSource = DbEvent & {
+      event_sources: { name: string; slug: string } | null;
+    };
+
+    const event = eventData as EventWithSource;
+    const { event_sources, ...eventDataOnly } = event;
+
     // Enhance with user interaction state
-    let eventWithInteractions: EventWithInteractions = { ...event };
+    let eventWithInteractions: EventWithInteractions = {
+      ...eventDataOnly,
+      source_id: event.source_id,
+      source_name: event_sources?.name,
+      source_slug: event_sources?.slug,
+    };
 
     if (user) {
       eventWithInteractions.is_bookmarked = await isEventBookmarked(
@@ -96,9 +117,14 @@ export async function POST(
       return NextResponse.json(errorResponse, { status: 401 });
     }
 
-    const event = await getEventById(id);
+    // Check if event exists
+    const { data: event, error } = await supabase
+      .from(TABLES.EVENTS)
+      .select("id")
+      .eq("id", id)
+      .single();
 
-    if (!event) {
+    if (error || !event) {
       const errorResponse: ApiResponse = {
         success: false,
         error: "Event not found",
@@ -166,9 +192,14 @@ export async function PUT(
       return NextResponse.json(errorResponse, { status: 401 });
     }
 
-    const event = await getEventById(id);
+    // Check if event exists
+    const { data: event, error } = await supabase
+      .from(TABLES.EVENTS)
+      .select("id")
+      .eq("id", id)
+      .single();
 
-    if (!event) {
+    if (error || !event) {
       const errorResponse: ApiResponse = {
         success: false,
         error: "Event not found",
@@ -220,9 +251,14 @@ export async function DELETE(
       return NextResponse.json(errorResponse, { status: 401 });
     }
 
-    const event = await getEventById(id);
+    // Check if event exists
+    const { data: event, error } = await supabase
+      .from(TABLES.EVENTS)
+      .select("id")
+      .eq("id", id)
+      .single();
 
-    if (!event) {
+    if (error || !event) {
       const errorResponse: ApiResponse = {
         success: false,
         error: "Event not found",

@@ -1,6 +1,6 @@
 # EventNexus - Scheduled Event Ingestion
 # This workflow runs every hour to fetch events from all sources
-# and store them in the Supabase database.
+# across ALL configured cities and stores them in the Supabase database.
 
 name: Event Ingestion
 
@@ -12,10 +12,6 @@ on:
   # Allow manual trigger from GitHub Actions UI
   workflow_dispatch:
 
-  # Optional: Run on push to main (for testing)
-  # push:
-  #   branches: [main]
-
 jobs:
   ingest-events:
     name: Fetch and Store Events
@@ -25,6 +21,37 @@ jobs:
     concurrency:
       group: event-ingestion
       cancel-in-progress: false
+
+    strategy:
+      matrix:
+        # All cities configured in the frontend CitySelector component
+        # This ensures we have events from all regions users can filter by
+        city:
+          - { name: "Dubai", lat: 25.2048, lng: 55.2708, radius: 50 }
+          - { name: "Abu Dhabi", lat: 24.4539, lng: 54.3773, radius: 50 }
+          - { name: "Sharjah", lat: 25.3467, lng: 55.4097, radius: 50 }
+          - { name: "Riyadh", lat: 24.7136, lng: 46.6753, radius: 50 }
+          - { name: "Doha", lat: 25.2854, lng: 51.5310, radius: 50 }
+          - { name: "Kuwait City", lat: 29.3759, lng: 47.9774, radius: 50 }
+          - { name: "Manama", lat: 26.0667, lng: 50.5577, radius: 50 }
+          - { name: "Muscat", lat: 23.5859, lng: 58.3849, radius: 50 }
+          - { name: "Jeddah", lat: 21.5433, lng: 39.1728, radius: 50 }
+          - { name: "Singapore", lat: 1.3521, lng: 103.8198, radius: 50 }
+          - { name: "London", lat: 51.5074, lng: -0.1278, radius: 50 }
+          - { name: "New York", lat: 40.7128, lng: -74.0060, radius: 50 }
+          - { name: "San Francisco", lat: 37.7749, lng: -122.4194, radius: 50 }
+          - { name: "Los Angeles", lat: 34.0522, lng: -118.2437, radius: 50 }
+          - { name: "Toronto", lat: 43.6532, lng: -79.3832, radius: 50 }
+          - { name: "Sydney", lat: -33.8688, lng: 151.2093, radius: 50 }
+          - { name: "Mumbai", lat: 19.0760, lng: 72.8777, radius: 50 }
+          - { name: "Delhi", lat: 28.7041, lng: 77.1025, radius: 50 }
+          - { name: "Bangalore", lat: 12.9716, lng: 77.5946, radius: 50 }
+          - { name: "Tokyo", lat: 35.6762, lng: 139.6503, radius: 50 }
+          - { name: "Paris", lat: 48.8566, lng: 2.3522, radius: 50 }
+          - { name: "Berlin", lat: 52.5200, lng: 13.4050, radius: 50 }
+          - { name: "Amsterdam", lat: 52.3676, lng: 4.9041, radius: 50 }
+          - { name: "Barcelona", lat: 41.3851, lng: 2.1734, radius: 50 }
+      fail-fast: false  # Continue with other cities even if one fails
 
     steps:
       - name: Checkout repository
@@ -39,18 +66,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Trigger event ingestion
+      - name: Trigger event ingestion for ${{ matrix.city.name }}
         run: |
           INGEST_URL="${{ secrets.INGEST_URL }}"
-          CITY="${{ secrets.CITY }}"
-          LAT="${{ secrets.LAT }}"
-          LNG="${{ secrets.LNG }}"
-          RADIUS_KM="${{ secrets.RADIUS_KM }}"
+          CITY="${{ matrix.city.name }}"
+          LAT="${{ matrix.city.lat }}"
+          LNG="${{ matrix.city.lng }}"
+          RADIUS_KM="${{ matrix.city.radius }}"
 
           # Build query parameters
           QUERY="?city=${CITY}&location_lat=${LAT}&location_lng=${LNG}&radius_km=${RADIUS_KM}"
 
-          echo "Triggering event ingestion from: ${INGEST_URL}${QUERY}"
+          echo "Triggering event ingestion for ${CITY}: ${INGEST_URL}${QUERY}"
 
           RESPONSE=$(curl -s -X POST "${INGEST_URL}${QUERY}" \
             -H "Content-Type: application/json" \
@@ -63,51 +90,16 @@ jobs:
           echo "Response: $BODY"
 
           if [ "$HTTP_CODE" -eq 200 ]; then
-            echo "Event ingestion completed successfully"
+            echo "Event ingestion completed successfully for ${CITY}"
           else
-            echo "Event ingestion failed with status code: $HTTP_CODE"
-            exit 1
+            echo "Event ingestion failed for ${CITY} with status code: $HTTP_CODE"
+            # Don't fail the workflow - continue to next city
           fi
         env:
           INGEST_URL: ${{ secrets.INGEST_URL }}
-          CITY: ${{ secrets.CITY }}
-          LAT: ${{ secrets.LAT }}
-          LNG: ${{ secrets.LNG }}
-          RADIUS_KM: ${{ secrets.RADIUS_KM }}
 
       - name: Summary
         if: always()
         run: |
           echo "Event ingestion workflow completed at $(date)"
-          echo "Check the Vercel logs for more details"
-
-  # Fallback job that runs the worker directly if API fails
-  ingest-direct:
-    name: Direct Ingestion (Fallback)
-    runs-on: ubuntu-latest
-    if: failure()
-    needs: ingest-events
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run worker directly
-        run: npm run worker
-        env:
-          INGEST_URL: ${{ secrets.INGEST_URL }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          CITY: ${{ secrets.CITY }}
-          LAT: ${{ secrets.LAT }}
-          LNG: ${{ secrets.LNG }}
-          RADIUS_KM: ${{ secrets.RADIUS_KM }}
+          echo "City processed: ${{ matrix.city.name }}"

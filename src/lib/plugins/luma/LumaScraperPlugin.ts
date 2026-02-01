@@ -45,9 +45,10 @@ export class LumaScraperPlugin extends WebScraperPlugin {
   protected buildUrl(filters: EventFilters): string {
     let url = this.scraperConfig.url;
 
-    // Check if city is provided
-    if (filters.city) {
-      const citySlug = this.cityToSlug(filters.city);
+    // Check if city is provided in filters.city or filters.location?.city
+    const cityName = filters.city || (filters.location as any)?.city;
+    if (cityName) {
+      const citySlug = this.cityToSlug(cityName);
       url = `${LUMA_BASE_URL}/${citySlug}`;
     }
 
@@ -418,10 +419,12 @@ export class LumaScraperPlugin extends WebScraperPlugin {
       }
     }
 
-    // Check for badges or tags in the card
-    const badgeText = this.extractText($card.find("span[class*='badge'], span[class*='tag'], span[class*='category']"));
-    if (badgeText && badgeText.length < 30) {
-      return badgeText;
+    // Check for badges or tags in the card (only if $card is provided)
+    if ($card && $card.find) {
+      const badgeText = this.extractText($card.find("span[class*='badge'], span[class*='tag'], span[class*='category']"));
+      if (badgeText && badgeText.length < 30) {
+        return badgeText;
+      }
     }
 
     return undefined;

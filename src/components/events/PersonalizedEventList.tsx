@@ -1,12 +1,13 @@
 /**
  * Personalized Event List Component
  * Fetches events based on user preferences when authenticated
+ * Now watches URL params for city, source, category filtering
  */
 
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { EventCard } from "./EventCard";
 import { CardSkeleton } from "../ui/LoadingSpinner";
@@ -30,21 +31,23 @@ interface Event {
   tags: string[] | null;
   is_bookmarked?: boolean;
   is_hidden?: boolean;
+  source_name?: string;
+  source_slug?: string;
 }
 
 interface PersonalizedEventListProps {
   initialEvents?: Event[];
   pageSize?: number;
-  fetchUrl?: string;
 }
 
 export function PersonalizedEventList({
   initialEvents = [],
   pageSize = 12,
-  fetchUrl = "/api/events",
 }: PersonalizedEventListProps) {
   const { user, isAuthenticated } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [events, setEvents] = useState<Event[]>(initialEvents);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -68,23 +71,44 @@ export function PersonalizedEventList({
     }
   }, [isAuthenticated, user]);
 
-  // Build URL with personalization params
+  // Build URL with all filter params
   const buildFetchUrl = useCallback(
     async (pageNum: number) => {
-      const url = new URL(fetchUrl, window.location.origin);
-      url.searchParams.set("page", pageNum.toString());
-      url.searchParams.set("per_page", pageSize.toString());
+      const params = new URLSearchParams();
+      params.set("page", pageNum.toString());
+      params.set("per_page", pageSize.toString());
 
-      // Add user preferences if authenticated
+      // Add URL params from searchParams (city, sources, categories, query)
+      const city = searchParams.get("city");
+      if (city && city !== "All Cities") {
+        params.set("city", city);
+      }
+
+      const sources = searchParams.get("sources");
+      if (sources) {
+        params.set("sources", sources);
+      }
+
+      const categories = searchParams.get("categories");
+      if (categories) {
+        params.set("categories", categories);
+      }
+
+      const query = searchParams.get("q");
+      if (query) {
+        params.set("q", query);
+      }
+
+      // Add user preferences if authenticated (overrides some URL params for personalization)
       const prefs = await fetchUserPreferences();
       if (prefs) {
         setUsingPersonalization(true);
 
-        // Add location filter if user has location preference
-        if (prefs.location_lat !== null && prefs.location_lng !== null) {
-          url.searchParams.set("lat", prefs.location_lat.toString());
-          url.searchParams.set("lng", prefs.location_lng.toString());
-          url.searchParams.set(
+        // Only add location filter if not already set by city selector
+        if (!city && prefs.location_lat !== null && prefs.location_lng !== null) {
+          params.set("lat", prefs.location_lat.toString());
+          params.set("lng", prefs.location_lng.toString());
+          params.set(
             "radius_km",
             (prefs.location_radius_km || 50).toString()
           );
@@ -92,23 +116,23 @@ export function PersonalizedEventList({
 
         // Add interests filter
         if (prefs.interests && prefs.interests.length > 0) {
-          url.searchParams.set("interests", prefs.interests.join(","));
+          params.set("interests", prefs.interests.join(","));
         }
 
         // Add preferred days/times
         if (prefs.preferred_days && prefs.preferred_days.length > 0) {
-          url.searchParams.set("preferred_days", prefs.preferred_days.join(","));
+          params.set("preferred_days", prefs.preferred_days.join(","));
         }
         if (prefs.preferred_times && prefs.preferred_times.length > 0) {
-          url.searchParams.set("preferred_times", prefs.preferred_times.join(","));
+          params.set("preferred_times", prefs.preferred_times.join(","));
         }
       } else {
         setUsingPersonalization(false);
       }
 
-      return url.toString();
+      return `/api/events?${params.toString()}`;
     },
-    [fetchUrl, pageSize, fetchUserPreferences]
+    [searchParams, pageSize, fetchUserPreferences]
   );
 
   // Load events function
@@ -150,10 +174,17 @@ export function PersonalizedEventList({
     [buildFetchUrl]
   );
 
-  // Load personalized events when auth state changes
+  // Load events when URL params change
   useEffect(() => {
     loadEvents(1);
-  }, [isAuthenticated, user?.id]);
+  }, [searchParams]); // Only depend on searchParams, not loadEvents
+
+  // Also reload when auth state changes
+  useEffect(() => {
+    if (user) {
+      loadEvents(1);
+    }
+  }, [user?.id]);
 
   const handleBookmark = async (eventId: string) => {
     try {

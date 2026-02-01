@@ -1,6 +1,7 @@
 /**
  * Event Card Component
  * Displays a single event with all relevant information
+ * Now includes city and source badges
  */
 
 "use client";
@@ -10,6 +11,7 @@ import { formatDistanceToNow } from "date-fns";
 import { CalendarIcon, MapPinIcon, ClockIcon, BookmarkIcon } from "@heroicons/react/24/outline";
 import { BookmarkIcon as BookmarkSolidIcon } from "@heroicons/react/24/solid";
 import type { DbEvent } from "@/lib/db/schema";
+import { extractCity } from "@/lib/utils/location";
 
 export interface EventCardProps {
   event: {
@@ -30,11 +32,12 @@ export interface EventCardProps {
     tags: string[] | null;
     is_bookmarked?: boolean;
     is_hidden?: boolean;
+    source_name?: string;
+    source_slug?: string;
   };
   onBookmark?: (eventId: string) => void;
   onClick?: (eventId: string) => void;
   showBookmark?: boolean;
-  showSource?: boolean;
 }
 
 export function EventCard({
@@ -42,11 +45,13 @@ export function EventCard({
   onBookmark,
   onClick,
   showBookmark = true,
-  showSource = false,
 }: EventCardProps) {
   const eventDate = new Date(event.start_time);
   const endDate = event.end_time ? new Date(event.end_time) : null;
   const timeUntilEvent = formatDistanceToNow(eventDate, { addSuffix: true });
+
+  // Extract city from location name
+  const city = extractCity(event.location_name);
 
   const formatEventTime = (date: Date) => {
     return date.toLocaleTimeString("en-US", {
@@ -86,13 +91,27 @@ export function EventCard({
             alt={event.title}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />
-          {showSource && (
-            <div className="absolute top-3 left-3">
-              <span className="px-2 py-1 bg-black/50 backdrop-blur-sm text-white text-xs font-medium rounded-full capitalize">
-                {event.source_id}
+          {/* Badges overlay */}
+          <div className="absolute top-3 left-3 flex flex-wrap gap-2">
+            {/* Source Badge */}
+            {event.source_name && (
+              <span className="px-2 py-1 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm text-xs font-medium rounded-full shadow-sm">
+                {event.source_name}
               </span>
-            </div>
-          )}
+            )}
+            {/* City Badge */}
+            {city && !event.is_virtual && (
+              <span className="px-2 py-1 bg-blue-500/90 dark:bg-blue-600/90 backdrop-blur-sm text-white text-xs font-medium rounded-full shadow-sm">
+                {city}
+              </span>
+            )}
+            {/* Virtual Badge */}
+            {event.is_virtual && (
+              <span className="px-2 py-1 bg-purple-500/90 dark:bg-purple-600/90 backdrop-blur-sm text-white text-xs font-medium rounded-full shadow-sm">
+                Virtual
+              </span>
+            )}
+          </div>
           {showBookmark && (
             <button
               onClick={handleBookmarkClick}
@@ -111,6 +130,27 @@ export function EventCard({
           <span className="text-white text-6xl font-bold opacity-30">
             {event.title.charAt(0)}
           </span>
+          {/* Badges overlay - no image */}
+          <div className="absolute top-3 left-3 flex flex-wrap gap-2">
+            {/* Source Badge */}
+            {event.source_name && (
+              <span className="px-2 py-1 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm text-xs font-medium rounded-full shadow-sm">
+                {event.source_name}
+              </span>
+            )}
+            {/* City Badge */}
+            {city && !event.is_virtual && (
+              <span className="px-2 py-1 bg-blue-500/90 dark:bg-blue-600/90 backdrop-blur-sm text-white text-xs font-medium rounded-full shadow-sm">
+                {city}
+              </span>
+            )}
+            {/* Virtual Badge */}
+            {event.is_virtual && (
+              <span className="px-2 py-1 bg-purple-500/90 dark:bg-purple-600/90 backdrop-blur-sm text-white text-xs font-medium rounded-full shadow-sm">
+                Virtual
+              </span>
+            )}
+          </div>
           {showBookmark && (
             <button
               onClick={handleBookmarkClick}
@@ -183,14 +223,14 @@ export function EventCard({
           </div>
 
           {/* Location */}
-          {event.location_name && (
+          {event.location_name && !event.is_virtual && (
             <div className="flex items-center gap-2">
               <MapPinIcon className="h-4 w-4" />
               <span className="truncate">{event.location_name}</span>
             </div>
           )}
 
-          {/* Virtual Badge */}
+          {/* Virtual Badge for detail text */}
           {event.is_virtual && (
             <div className="flex items-center gap-2">
               <svg
@@ -201,7 +241,7 @@ export function EventCard({
                 <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74-4.436a1 1 0 011.986 0l.74 4.436a1 1 0 01.986-.836h3a1 1 0 011 1v10a1 1 0 01-1 1h-2a1 1 0 01-1-1v-2a1 1 0 00-1-1H7a1 1 0 00-1 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V3zM15 4H9v1h6V4zM9 8h6v1h-6V8zm0 2h6v1h-6v-1z" />
               </svg>
               <span className="text-purple-600 dark:text-purple-400 font-medium">
-                Virtual Event
+                Online Event
               </span>
             </div>
           )}

@@ -159,6 +159,7 @@ describe("Auth - Client", () => {
           data: {
             display_name: "Test User",
           },
+          emailRedirectTo: "http://localhost:3000/preferences",
         },
       });
     });

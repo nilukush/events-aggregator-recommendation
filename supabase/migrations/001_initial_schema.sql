@@ -167,6 +167,7 @@ CREATE TRIGGER update_user_preferences_updated_at BEFORE UPDATE ON user_preferen
 
 -- Function to get nearby events using PostGIS geolocation
 -- Uses ST_DWithin for efficient distance-based queries with GiST index
+-- Note: Does not filter by date to allow showing all events (past and future)
 CREATE OR REPLACE FUNCTION get_nearby_events(
   lat DECIMAL,
   lng DECIMAL,
@@ -180,13 +181,13 @@ BEGIN
   FROM events e
   WHERE e.location_lat IS NOT NULL
     AND e.location_lng IS NOT NULL
-    AND e.start_time >= NOW()
     AND ST_DWithin(
       CAST(ST_SetSRID(ST_MakePoint(e.location_lng, e.location_lat), 4326) AS geography),
       CAST(ST_SetSRID(ST_MakePoint(lng, lat), 4326) AS geography),
       radius_km * 1000  -- Convert km to meters for ST_DWithin
     )
   ORDER BY
+    e.start_time DESC,  -- Show most recent events first
     ST_Distance(
       CAST(ST_SetSRID(ST_MakePoint(e.location_lng, e.location_lat), 4326) AS geography),
       CAST(ST_SetSRID(ST_MakePoint(lng, lat), 4326) AS geography)
@@ -232,6 +233,7 @@ CREATE POLICY "Users can view own recommendations" ON recommendations
 
 -- Grant usage on sequences
 GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO authenticated;
+GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO anon;
 
 -- Grant select on tables that should be readable by authenticated users
 GRANT SELECT ON events TO authenticated;
@@ -240,5 +242,11 @@ GRANT SELECT, INSERT, UPDATE ON user_preferences TO authenticated;
 GRANT SELECT, INSERT ON user_interactions TO authenticated;
 GRANT SELECT ON recommendations TO authenticated;
 
+-- Grant select on public tables (events, event_sources) to anon (unauthenticated users)
+-- This allows the public event feed to work without sign-in
+GRANT SELECT ON events TO anon;
+GRANT SELECT ON event_sources TO anon;
+
 -- Grant execute on the nearby events function
 GRANT EXECUTE ON FUNCTION get_nearby_events TO authenticated;
+GRANT EXECUTE ON FUNCTION get_nearby_events TO anon;

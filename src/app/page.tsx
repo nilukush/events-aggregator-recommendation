@@ -72,19 +72,21 @@ import { EventFilters } from "@/components/events/EventFilters";
 
 function EventFiltersWrapper() {
   return (
-    <EventFilters
-      availableCategories={[
-        "Technology",
-        "Business",
-        "Networking",
-        "Music",
-        "Arts",
-        "Sports",
-        "Food & Drink",
-        "Education",
-      ]}
-      availableSources={["eventbrite", "meetup", "luma", "fractional-dubai"]}
-    />
+    <Suspense fallback={<div className="h-20" />}>
+      <EventFilters
+        availableCategories={[
+          "Technology",
+          "Business",
+          "Networking",
+          "Music",
+          "Arts",
+          "Sports",
+          "Food & Drink",
+          "Education",
+        ]}
+        availableSources={["eventbrite", "meetup", "luma", "fractional-dubai"]}
+      />
+    </Suspense>
   );
 }
 

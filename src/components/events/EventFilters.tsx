@@ -1,27 +1,19 @@
 /**
  * Event Filters Component
  * Provides filtering options for the event feed
+ * Now uses URL-based state management for better filtering
  */
 
 "use client";
 
 import React, { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   MagnifyingGlassIcon,
   AdjustmentsHorizontalIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { CitySelector } from "./CitySelector";
-
-export interface EventFiltersProps {
-  onSearchChange?: (query: string) => void;
-  onSourceChange?: (sources: string[]) => void;
-  onCategoryChange?: (categories: string[]) => void;
-  onCityChange?: (city: string) => void;
-  onDateChange?: (startDate?: string, endDate?: string) => void;
-  availableCategories?: string[];
-  availableSources?: string[];
-}
 
 const SOURCES = [
   { value: "eventbrite", label: "Eventbrite" },
@@ -42,54 +34,56 @@ const DEFAULT_CATEGORIES = [
 ];
 
 export function EventFilters({
-  onSearchChange,
-  onSourceChange,
-  onCategoryChange,
-  onCityChange,
-  onDateChange,
   availableCategories = DEFAULT_CATEGORIES,
   availableSources = SOURCES.map((s) => s.value),
-}: EventFiltersProps) {
+}: {
+  availableCategories?: string[];
+  availableSources?: string[];
+}) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [isExpanded, setIsExpanded] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedSources, setSelectedSources] = useState<string[]>([]);
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [selectedCity, setSelectedCity] = useState("All Cities");
 
-  const handleSearchChange = (value: string) => {
-    setSearchQuery(value);
-    onSearchChange?.(value);
+  // Get current filter values from URL
+  const searchQuery = searchParams.get("q") || "";
+  const selectedSources = searchParams.get("sources")?.split(",").filter(Boolean) || [];
+  const selectedCategories = searchParams.get("categories")?.split(",").filter(Boolean) || [];
+
+  // Update URL params
+  const updateParams = (updates: Record<string, string | null>) => {
+    const params = new URLSearchParams(searchParams.toString());
+
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value === null || value === "") {
+        params.delete(key);
+      } else {
+        params.set(key, value);
+      }
+    });
+
+    router.push(`/?${params.toString()}`);
   };
 
-  const handleCityChange = (city: string) => {
-    setSelectedCity(city);
-    onCityChange?.(city);
+  const handleSearchChange = (value: string) => {
+    updateParams({ q: value || null });
   };
 
   const toggleSource = (source: string) => {
     const newSources = selectedSources.includes(source)
       ? selectedSources.filter((s) => s !== source)
       : [...selectedSources, source];
-    setSelectedSources(newSources);
-    onSourceChange?.(newSources);
+    updateParams({ sources: newSources.length > 0 ? newSources.join(",") : null });
   };
 
   const toggleCategory = (category: string) => {
     const newCategories = selectedCategories.includes(category)
       ? selectedCategories.filter((c) => c !== category)
       : [...selectedCategories, category];
-    setSelectedCategories(newCategories);
-    onCategoryChange?.(newCategories);
+    updateParams({ categories: newCategories.length > 0 ? newCategories.join(",") : null });
   };
 
   const clearAllFilters = () => {
-    setSearchQuery("");
-    setSelectedSources([]);
-    setSelectedCategories([]);
-    onSearchChange?.("");
-    onSourceChange?.([]);
-    onCategoryChange?.([]);
-    onDateChange?.();
+    updateParams({ q: null, sources: null, categories: null });
   };
 
   const hasActiveFilters =
@@ -109,7 +103,7 @@ export function EventFilters({
             className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
-        <CitySelector selectedCity={selectedCity} onCityChange={handleCityChange} />
+        <CitySelector />
         <button
           onClick={() => setIsExpanded(!isExpanded)}
           className={`p-2 rounded-lg border transition-colors ${

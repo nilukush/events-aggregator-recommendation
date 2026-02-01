@@ -127,10 +127,17 @@ export async function signIn(credentials: SignInCredentials): Promise<AuthResult
       password: credentials.password,
     });
 
-    if (error || !data.session || !data.user) {
+    if (error) {
       return {
         success: false,
-        error: error?.message || "Sign in failed",
+        error: error.message || "Sign in failed",
+      };
+    }
+
+    if (!data.session || !data.user) {
+      return {
+        success: false,
+        error: "Sign in failed",
       };
     }
 
@@ -154,6 +161,7 @@ export async function signIn(credentials: SignInCredentials): Promise<AuthResult
 
 /**
  * Sign up with email and password
+ * Note: Email confirmation is disabled for immediate sign-in
  */
 export async function signUp(credentials: SignUpCredentials): Promise<AuthResult> {
   try {
@@ -164,6 +172,7 @@ export async function signUp(credentials: SignUpCredentials): Promise<AuthResult
         data: {
           display_name: credentials.displayName,
         },
+        emailRedirectTo: `${typeof window !== "undefined" ? window.location.origin : process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/preferences`,
       },
     });
 

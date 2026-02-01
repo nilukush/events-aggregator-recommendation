@@ -65,8 +65,15 @@ export interface EventFilters {
 /**
  * Extended event type for API responses
  * Includes user interaction state when authenticated
+ * and joined data from related tables
  */
-export interface EventWithInteractions extends DbEvent {
+export interface EventWithInteractions extends Omit<DbEvent, 'source_id'> {
+  // Keep source_id for compatibility but add source_name
+  source_id: string;
+  // Joined from event_sources table
+  source_name?: string;
+  source_slug?: string;
+  // User interaction state
   is_bookmarked?: boolean;
   is_hidden?: boolean;
   interaction_count?: number;

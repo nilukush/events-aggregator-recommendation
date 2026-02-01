@@ -9,18 +9,14 @@
  * - Sorting by date, relevance, popularity
  * - User-specific filtering (bookmarked, hidden)
  * - Date/time preference filtering
+ * - Includes source_name from event_sources join
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { getServerUser } from "@/lib/auth/server-client";
-import {
-  getEvents,
-  getEventsBySource,
-  getEventsByDateRange,
-  getEventsByLocation,
-  getEventsByCategory,
-  searchEvents,
-} from "@/lib/db/queries";
+import { supabase } from "@/lib/supabase";
+import { TABLES } from "@/lib/db/schema";
+import type { DbEvent } from "@/lib/db/schema";
 import type {
   ApiResponse,
   EventFilters,
@@ -165,30 +161,51 @@ function parseFilters(searchParams: URLSearchParams): EventFilters {
  * GET /api/events
  *
  * Fetch and filter events with pagination
+ * Now includes source_name from event_sources join
  */
 export async function GET(request: NextRequest) {
   try {
     const filters = parseFilters(request.nextUrl.searchParams);
     const user = await getServerUser();
 
-    // Start with base query
-    let events = await getEvents();
+    // Build base query with join to event_sources
+    let query = supabase
+      .from(TABLES.EVENTS)
+      .select("*, event_sources(name, slug)", { count: "exact" });
 
     // Apply text search if provided
     if (filters.query) {
-      const searchResults = await searchEvents(filters.query);
-      events = searchResults;
+      query = query.or(`title.ilike.%${filters.query}%,description.ilike.%${filters.query}%`);
     }
+
+    // Execute query to get all events (we filter in memory for complex cases)
+    const { data: eventsData, error, count } = await query
+      .order("fetched_at", { ascending: false })
+      .order("start_time", { ascending: true });
+
+    if (error) throw error;
+
+    // Type assertion for joined data
+    type EventWithSource = DbEvent & {
+      event_sources: { name: string; slug: string } | null;
+    };
+
+    let events = (eventsData || []) as EventWithSource[];
 
     // Filter by sources
     if (filters.sources && filters.sources.length > 0) {
-      const bySource = await Promise.all(
-        filters.sources.map((source) => getEventsBySource(source))
+      const sources = await Promise.all(
+        filters.sources.map(async (slug) => {
+          const { data } = await supabase
+            .from(TABLES.EVENT_SOURCES)
+            .select("id")
+            .eq("slug", slug)
+            .single();
+          return data;
+        })
       );
-      const sourceEventIds = new Set(
-        bySource.flatMap((list) => list.map((e) => e.id))
-      );
-      events = events.filter((e) => sourceEventIds.has(e.id));
+      const sourceIds = new Set(sources.map((s) => s?.id).filter(Boolean));
+      events = events.filter((e) => sourceIds.has(e.source_id));
     }
 
     // Filter by date range
@@ -205,22 +222,23 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Filter by location
+    // Filter by location using nearby events function
     if (filters.lat !== undefined && filters.lng !== undefined) {
-      const locationEvents = await getEventsByLocation(
-        filters.lat,
-        filters.lng,
-        filters.radius_km || 25
-      );
-      const locationEventIds = new Set(locationEvents.map((e) => e.id));
-      events = events.filter((e) => locationEventIds.has(e.id));
+      const { data: nearbyEvents } = await supabase.rpc("get_nearby_events", {
+        lat: filters.lat,
+        lng: filters.lng,
+        radius_km: filters.radius_km || 50,
+        limit_count: 1000,
+      });
+      const nearbyEventIds = new Set((nearbyEvents || []).map((e: DbEvent) => e.id));
+      events = events.filter((e) => nearbyEventIds.has(e.id));
     }
 
     // Filter by categories
     if (filters.categories && filters.categories.length > 0) {
-      const categoryEvents = await getEventsByCategory(filters.categories);
-      const categoryEventIds = new Set(categoryEvents.map((e) => e.id));
-      events = events.filter((e) => categoryEventIds.has(e.id));
+      events = events.filter((e) =>
+        e.category ? filters.categories!.includes(e.category) : false
+      );
     }
 
     // Filter by interests (matches event tags or category)
@@ -237,18 +255,15 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Filter by user interactions (if authenticated)
-    if (user) {
-      // Filter out hidden events unless explicitly requested
-      if (!filters.include_hidden) {
-        const hiddenEventIds = new Set<string>();
-        for (const event of events) {
-          if (await isEventHidden(user.id, event.id)) {
-            hiddenEventIds.add(event.id);
-          }
+    // Filter out hidden events (if authenticated)
+    if (user && !filters.include_hidden) {
+      const hiddenEventIds = new Set<string>();
+      for (const event of events) {
+        if (await isEventHidden(user.id, event.id)) {
+          hiddenEventIds.add(event.id);
         }
-        events = events.filter((e) => !hiddenEventIds.has(e.id));
       }
+      events = events.filter((e) => !hiddenEventIds.has(e.id));
     }
 
     // Sort events
@@ -265,7 +280,6 @@ export async function GET(request: NextRequest) {
             new Date(b.start_time).getTime();
           break;
         case "relevance":
-          // Simple relevance: favor events matching more interests
           const aInterests = (a as any).interests_matched || 0;
           const bInterests = (b as any).interests_matched || 0;
           comparison = bInterests - aInterests;
@@ -285,10 +299,17 @@ export async function GET(request: NextRequest) {
     const start = (page - 1) * perPage;
     const paginatedEvents = events.slice(start, start + perPage);
 
-    // Enhance with user interaction state
+    // Enhance with user interaction state and flatten source data
     const enhancedEvents: EventWithInteractions[] = [];
     for (const event of paginatedEvents) {
-      let eventWithInteractions: EventWithInteractions = { ...event };
+      const { event_sources, ...eventData } = event;
+
+      let eventWithInteractions: EventWithInteractions = {
+        ...eventData,
+        source_id: event.source_id,
+        source_name: event_sources?.name,
+        source_slug: event_sources?.slug,
+      };
 
       if (user) {
         eventWithInteractions.is_bookmarked = await isEventBookmarked(

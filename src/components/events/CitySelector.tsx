@@ -1,17 +1,14 @@
 /**
  * City Selector Component
  * Allows users to select a city for event discovery
+ * Now uses URL-based state management for better filtering
  */
 
 "use client";
 
 import React from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { MapPinIcon, ChevronDownIcon } from "@heroicons/react/24/outline";
-
-export interface CitySelectorProps {
-  selectedCity?: string;
-  onCityChange?: (city: string) => void;
-}
 
 const CITIES = [
   { name: "Dubai", slug: "dubai", lat: 25.2048, lng: 55.2708 },
@@ -40,9 +37,29 @@ const CITIES = [
   { name: "Barcelona", slug: "barcelona", lat: 41.3851, lng: 2.1734 },
 ];
 
-export function CitySelector({ selectedCity = "All Cities", onCityChange }: CitySelectorProps) {
+export function CitySelector() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [isOpen, setIsOpen] = React.useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  // Get current city from URL params
+  const selectedCity = searchParams.get("city") || "All Cities";
+
+  // Update URL when city changes
+  const updateCity = (cityName: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+
+    if (cityName === "All Cities") {
+      params.delete("city");
+    } else {
+      params.set("city", cityName);
+    }
+
+    // Navigate to new URL preserving other params
+    router.push(`/?${params.toString()}`);
+    setIsOpen(false);
+  };
 
   // Close dropdown when clicking outside
   React.useEffect(() => {
@@ -55,17 +72,6 @@ export function CitySelector({ selectedCity = "All Cities", onCityChange }: City
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  const handleCitySelect = (city: typeof CITIES[0]) => {
-    const cityName = city.name;
-    onCityChange?.(cityName);
-    setIsOpen(false);
-  };
-
-  const handleAllCities = () => {
-    onCityChange?.("All Cities");
-    setIsOpen(false);
-  };
 
   return (
     <div ref={dropdownRef} className="relative">
@@ -83,7 +89,7 @@ export function CitySelector({ selectedCity = "All Cities", onCityChange }: City
           <div className="p-2">
             {/* "All Cities" option */}
             <button
-              onClick={handleAllCities}
+              onClick={() => updateCity("All Cities")}
               className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
                 selectedCity === "All Cities"
                   ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
@@ -115,7 +121,7 @@ export function CitySelector({ selectedCity = "All Cities", onCityChange }: City
                   {group.cities.map((city) => (
                     <button
                       key={city.slug}
-                      onClick={() => handleCitySelect(city)}
+                      onClick={() => updateCity(city.name)}
                       className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
                         selectedCity === city.name
                           ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
