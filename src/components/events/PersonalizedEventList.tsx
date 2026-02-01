@@ -1,58 +1,115 @@
 /**
- * Event List Component
- * Manages the display of events with pagination and infinite scroll
+ * Personalized Event List Component
+ * Fetches events based on user preferences when authenticated
  */
 
 "use client";
 
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth/AuthProvider";
 import { EventCard } from "./EventCard";
-import { CardSkeleton, PageLoading } from "../ui/LoadingSpinner";
+import { CardSkeleton } from "../ui/LoadingSpinner";
 import { ChevronDownIcon } from "@heroicons/react/24/outline";
 
-export interface EventListProps {
-  initialEvents?: Array<{
-    id: string;
-    source_id: string;
-    external_id: string;
-    title: string;
-    description: string | null;
-    event_url: string;
-    image_url: string | null;
-    start_time: string;
-    end_time: string | null;
-    location_name: string | null;
-    location_lat: number | null;
-    location_lng: number | null;
-    is_virtual: boolean;
-    category: string | null;
-    tags: string[] | null;
-    is_bookmarked?: boolean;
-    is_hidden?: boolean;
-  }>;
-  fetchUrl?: string;
-  pageSize?: number;
-  onBookmark?: (eventId: string) => void;
-  onEventClick?: (eventId: string) => void;
+interface Event {
+  id: string;
+  source_id: string;
+  external_id: string;
+  title: string;
+  description: string | null;
+  event_url: string;
+  image_url: string | null;
+  start_time: string;
+  end_time: string | null;
+  location_name: string | null;
+  location_lat: number | null;
+  location_lng: number | null;
+  is_virtual: boolean;
+  category: string | null;
+  tags: string[] | null;
+  is_bookmarked?: boolean;
+  is_hidden?: boolean;
 }
 
-export function EventList({
+interface PersonalizedEventListProps {
+  initialEvents?: Event[];
+  pageSize?: number;
+  fetchUrl?: string;
+}
+
+export function PersonalizedEventList({
   initialEvents = [],
+  pageSize = 12,
   fetchUrl = "/api/events",
-  pageSize = 10,
-  onBookmark,
-  onEventClick,
-}: EventListProps) {
+}: PersonalizedEventListProps) {
+  const { user, isAuthenticated } = useAuth();
   const router = useRouter();
-  const [events, setEvents] = useState(initialEvents);
+  const [events, setEvents] = useState<Event[]>(initialEvents);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
+  const [usingPersonalization, setUsingPersonalization] = useState(false);
 
-  const observerTarget = useRef<HTMLButtonElement | null>(null);
+  // Fetch user preferences if authenticated
+  const fetchUserPreferences = useCallback(async () => {
+    if (!isAuthenticated || !user) return null;
+
+    try {
+      const response = await fetch("/api/user/preferences");
+      if (!response.ok) return null;
+
+      const data = await response.json();
+      return data.success ? data.data : null;
+    } catch {
+      return null;
+    }
+  }, [isAuthenticated, user]);
+
+  // Build URL with personalization params
+  const buildFetchUrl = useCallback(
+    async (pageNum: number) => {
+      const url = new URL(fetchUrl, window.location.origin);
+      url.searchParams.set("page", pageNum.toString());
+      url.searchParams.set("per_page", pageSize.toString());
+
+      // Add user preferences if authenticated
+      const prefs = await fetchUserPreferences();
+      if (prefs) {
+        setUsingPersonalization(true);
+
+        // Add location filter if user has location preference
+        if (prefs.location_lat !== null && prefs.location_lng !== null) {
+          url.searchParams.set("lat", prefs.location_lat.toString());
+          url.searchParams.set("lng", prefs.location_lng.toString());
+          url.searchParams.set(
+            "radius_km",
+            (prefs.location_radius_km || 50).toString()
+          );
+        }
+
+        // Add interests filter
+        if (prefs.interests && prefs.interests.length > 0) {
+          url.searchParams.set("interests", prefs.interests.join(","));
+        }
+
+        // Add preferred days/times
+        if (prefs.preferred_days && prefs.preferred_days.length > 0) {
+          url.searchParams.set("preferred_days", prefs.preferred_days.join(","));
+        }
+        if (prefs.preferred_times && prefs.preferred_times.length > 0) {
+          url.searchParams.set("preferred_times", prefs.preferred_times.join(","));
+        }
+      } else {
+        setUsingPersonalization(false);
+      }
+
+      return url.toString();
+    },
+    [fetchUrl, pageSize, fetchUserPreferences]
+  );
 
   // Load events function
   const loadEvents = useCallback(
@@ -65,11 +122,8 @@ export function EventList({
       setError(null);
 
       try {
-        const url = new URL(fetchUrl, window.location.origin);
-        url.searchParams.set("page", pageNum.toString());
-        url.searchParams.set("per_page", pageSize.toString());
-
-        const response = await fetch(url.toString());
+        const url = await buildFetchUrl(pageNum);
+        const response = await fetch(url);
         const data = await response.json();
 
         if (data.success && data.data) {
@@ -93,40 +147,13 @@ export function EventList({
         setIsLoadingMore(false);
       }
     },
-    [fetchUrl, pageSize]
+    [buildFetchUrl]
   );
 
-  // Initial load
+  // Load personalized events when auth state changes
   useEffect(() => {
-    if (initialEvents.length === 0) {
-      loadEvents(1);
-    } else {
-      setHasMore(initialEvents.length >= pageSize);
-    }
-  }, [initialEvents, pageSize, loadEvents]);
-
-  // Infinite scroll observer
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore && !isLoadingMore) {
-          loadEvents(page + 1, true);
-        }
-      },
-      { rootMargin: "100px" }
-    );
-
-    const currentTarget = observerTarget.current;
-    if (currentTarget) {
-      observer.observe(currentTarget);
-    }
-
-    return () => {
-      if (currentTarget) {
-        observer.unobserve(currentTarget);
-      }
-    };
-  }, [hasMore, isLoadingMore, page, loadEvents]);
+    loadEvents(1);
+  }, [isAuthenticated, user?.id]);
 
   const handleBookmark = async (eventId: string) => {
     try {
@@ -144,7 +171,6 @@ export function EventList({
                 : e
             )
           );
-          onBookmark?.(eventId);
         }
       }
     } catch (err) {
@@ -154,7 +180,7 @@ export function EventList({
 
   if (isLoading && events.length === 0) {
     return (
-      <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {Array.from({ length: 6 }).map((_, i) => (
           <CardSkeleton key={i} />
         ))}
@@ -197,7 +223,9 @@ export function EventList({
           No events found
         </h3>
         <p className="text-gray-600 dark:text-gray-400 text-sm">
-          Try adjusting your filters or check back later
+          {usingPersonalization
+            ? "Try adjusting your preferences or location settings"
+            : "Try adjusting your filters or check back later"}
         </p>
       </div>
     );
@@ -205,6 +233,15 @@ export function EventList({
 
   return (
     <div>
+      {/* Personalization Notice */}
+      {usingPersonalization && (
+        <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <p className="text-sm text-blue-800 dark:text-blue-300">
+            Showing events personalized based on your preferences.
+          </p>
+        </div>
+      )}
+
       {/* Events Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {events.map((event) => (
@@ -212,14 +249,7 @@ export function EventList({
             key={event.id}
             event={event}
             onBookmark={handleBookmark}
-            onClick={(eventId) => {
-              if (onEventClick) {
-                onEventClick(eventId);
-              } else {
-                // Default navigation to event detail page
-                router.push(`/events/${eventId}`);
-              }
-            }}
+            onClick={(eventId) => router.push(`/events/${eventId}`)}
             showBookmark
           />
         ))}
@@ -254,11 +284,10 @@ export function EventList({
         </div>
       )}
 
-      {/* Load More Button (fallback) */}
+      {/* Load More Button */}
       {hasMore && !isLoadingMore && (
         <div className="flex justify-center py-8">
           <button
-            ref={observerTarget}
             onClick={() => loadEvents(page + 1, true)}
             className="flex items-center gap-2 px-6 py-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
           >

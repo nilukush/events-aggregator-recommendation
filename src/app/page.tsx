@@ -4,7 +4,7 @@
  */
 
 import { Suspense } from "react";
-import { EventList } from "@/components/events/EventList";
+import { PersonalizedEventList } from "@/components/events/PersonalizedEventList";
 import { CardSkeleton } from "@/components/ui/LoadingSpinner";
 import Link from "next/link";
 
@@ -56,9 +56,9 @@ export default async function HomePage() {
         {/* Event Filters */}
         <EventFiltersWrapper />
 
-        {/* Events List */}
+        {/* Events List with Personalization */}
         <Suspense fallback={<LoadingGrid />}>
-          <EventList initialEvents={initialEvents} />
+          <PersonalizedEventList initialEvents={initialEvents} />
         </Suspense>
       </div>
     </main>
