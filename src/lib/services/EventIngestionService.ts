@@ -178,8 +178,20 @@ export class EventIngestionService {
       );
     } catch (error) {
       success = false;
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      // Better error serialization - handle both Error objects and other types
+      let errorMessage: string;
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === "object" && error !== null) {
+        // Handle serialization of error-like objects
+        try {
+          errorMessage = JSON.stringify(error);
+        } catch {
+          errorMessage = String(error);
+        }
+      } else {
+        errorMessage = String(error);
+      }
       errors.push(errorMessage);
       console.error(`Error ingesting from ${source}:`, errorMessage);
     }

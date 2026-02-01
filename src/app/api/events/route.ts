@@ -51,7 +51,46 @@ function parseFilters(searchParams: URLSearchParams): EventFilters {
     filters.end_date = endDate;
   }
 
-  // Location filtering
+  // Location filtering by city name
+  const city = searchParams.get("city");
+  if (city && city !== "All Cities") {
+    // City name coordinates mapping
+    const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
+      "Dubai": { lat: 25.2048, lng: 55.2708 },
+      "Abu Dhabi": { lat: 24.4539, lng: 54.3773 },
+      "Sharjah": { lat: 25.3467, lng: 55.4097 },
+      "Riyadh": { lat: 24.7136, lng: 46.6753 },
+      "Doha": { lat: 25.2854, lng: 51.5310 },
+      "Kuwait City": { lat: 29.3759, lng: 47.9774 },
+      "Manama": { lat: 26.0667, lng: 50.5577 },
+      "Muscat": { lat: 23.5859, lng: 58.3849 },
+      "Jeddah": { lat: 21.5433, lng: 39.1728 },
+      "Singapore": { lat: 1.3521, lng: 103.8198 },
+      "London": { lat: 51.5074, lng: -0.1278 },
+      "New York": { lat: 40.7128, lng: -74.0060 },
+      "San Francisco": { lat: 37.7749, lng: -122.4194 },
+      "Los Angeles": { lat: 34.0522, lng: -118.2437 },
+      "Toronto": { lat: 43.6532, lng: -79.3832 },
+      "Sydney": { lat: -33.8688, lng: 151.2093 },
+      "Mumbai": { lat: 19.0760, lng: 72.8777 },
+      "Delhi": { lat: 28.7041, lng: 77.1025 },
+      "Bangalore": { lat: 12.9716, lng: 77.5946 },
+      "Tokyo": { lat: 35.6762, lng: 139.6503 },
+      "Paris": { lat: 48.8566, lng: 2.3522 },
+      "Berlin": { lat: 52.5200, lng: 13.4050 },
+      "Amsterdam": { lat: 52.3676, lng: 4.9041 },
+      "Barcelona": { lat: 41.3851, lng: 2.1734 },
+    };
+
+    const coords = CITY_COORDS[city];
+    if (coords) {
+      filters.lat = coords.lat;
+      filters.lng = coords.lng;
+      filters.radius_km = 50; // Default 50km radius for city filtering
+    }
+  }
+
+  // Location filtering by coordinates (overrides city if both provided)
   const lat = searchParams.get("lat");
   const lng = searchParams.get("lng");
   const radius = searchParams.get("radius_km");

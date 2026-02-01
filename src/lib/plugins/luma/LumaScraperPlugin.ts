@@ -4,13 +4,17 @@
  * Scrapes events from Luma location-based discovery pages
  * URL pattern: https://lu.ma/{city-slug}
  * Example: https://lu.ma/dubai, https://lu.ma/london, https://lu.ma/new-york
+ *
+ * Note: Luma is a React SPA, so we use the web reader API which can handle
+ * JavaScript-rendered content via a service that extracts the page content.
  */
 
 import { WebScraperPlugin } from "../WebScraperPlugin";
-import type { EventFilters, PluginConfig } from "../types";
+import type { EventFilters, PluginConfig, NormalizedEvent } from "../types";
 import type { ParsedEvent } from "../WebScraperPlugin";
 
 const LUMA_BASE_URL = "https://lu.ma";
+const WEB_READER_API = "https://webreader-production.up.railway.app/webReader";
 
 /**
  * Luma Scraper Plugin
@@ -86,7 +90,152 @@ export class LumaScraperPlugin extends WebScraperPlugin {
   }
 
   /**
-   * Parse events from Luma HTML
+   * Override performFetch to use the web reader API for SPA content
+   */
+  public async performFetch(filters: EventFilters = {}): Promise<NormalizedEvent[]> {
+    // Wait for rate limit if needed
+    await this.waitForRateLimit();
+
+    const url = this.buildUrl(filters);
+
+    // Use the web reader API to get the page content as markdown
+    // This allows us to fetch JavaScript-rendered content
+    const response = await fetch(`${WEB_READER_API}?url=${encodeURIComponent(url)}&return_format=markdown`, {
+      method: "GET",
+      headers: {
+        "Accept": "application/json",
+      },
+      signal: AbortSignal.timeout(this.scraperConfig.timeout || this.config.timeout || 30000),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch ${url} via web reader: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    // The web reader returns an array, get the first item's content
+    const content = data?.[0]?.text?.content || data?.content || "";
+
+    if (!content) {
+      console.warn(`No content received from web reader for ${url}`);
+      return [];
+    }
+
+    // Parse the markdown content to extract events
+    const parsedEvents = this.parseEventsFromMarkdown(content, url);
+
+    // Normalize events
+    return this.normalizeEvents(parsedEvents);
+  }
+
+  /**
+   * Parse events from markdown content returned by web reader
+   */
+  protected parseEventsFromMarkdown(markdown: string, baseUrl: string): ParsedEvent[] {
+    const events: ParsedEvent[] = [];
+    const lines = markdown.split("\n");
+
+    let currentEvent: Partial<ParsedEvent> | null = null;
+    let inEventsSection = false;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+
+      // Check if we're in the Events section
+      if (line === "## Events") {
+        inEventsSection = true;
+        continue;
+      }
+
+      // Only process lines in the Events section
+      if (!inEventsSection) continue;
+
+      // Stop if we hit another major section
+      if (line.startsWith("## ") && line !== "## Events") {
+        break;
+      }
+
+      // Extract image URL (markdown format: ![...](url))
+      const imageMatch = line.match(/^!\[.*?\]\((https:\/\/[^)]+)\)/);
+      if (imageMatch) {
+        // Save the previous event if it has a title
+        if (currentEvent?.title) {
+          events.push(currentEvent as ParsedEvent);
+        }
+        // Start a new event
+        currentEvent = {
+          imageUrl: imageMatch[1],
+          tags: ["luma", "dubai"],
+        };
+        continue;
+      }
+
+      // Extract title (markdown heading format: ### Title)
+      const titleMatch = line.match(/^###\s+(.+)$/);
+      if (titleMatch && currentEvent) {
+        currentEvent.title = titleMatch[1].trim();
+        currentEvent.url = this.generateEventUrl(currentEvent.title);
+        continue;
+      }
+
+      // Extract host/organizer (starts with "By ")
+      if (line.startsWith("By ") && currentEvent) {
+        const host = line.substring(3).trim();
+        // Add to description or as a tag
+        if (!currentEvent.description) {
+          currentEvent.description = `Hosted by ${host}`;
+        }
+        currentEvent.tags = [...(currentEvent.tags || []), "hosted"];
+        continue;
+      }
+
+      // Extract location (looks like a venue name without special formatting)
+      // Location is typically on its own line, not starting with # or !
+      if (line &&
+          !line.startsWith("#") &&
+          !line.startsWith("!") &&
+          !line.startsWith("By") &&
+          line.length > 5 &&
+          line.length < 100 &&
+          !line.includes("http") &&
+          currentEvent &&
+          !currentEvent.location) {
+        // This is likely a location
+        currentEvent.location = line;
+        continue;
+      }
+
+      // Extract category from title
+      if (currentEvent?.title) {
+        currentEvent.category = this.extractLumaCategory(currentEvent.title, null);
+      }
+    }
+
+    // Don't forget the last event
+    if (currentEvent?.title) {
+      events.push(currentEvent as ParsedEvent);
+    }
+
+    return events;
+  }
+
+  /**
+   * Generate a URL for the event based on title
+   * Luma event URLs are /e/{slug}
+   */
+  protected generateEventUrl(title: string): string {
+    // Create a simple slug from the title
+    const slug = title
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, "")
+      .replace(/\s+/g, "-")
+      .substring(0, 50);
+    return `${LUMA_BASE_URL}/e/${slug}`;
+  }
+
+  /**
+   * Parse events from Luma HTML (legacy, kept for fallback)
    */
   protected parseEvents($: any, _filters: EventFilters): ParsedEvent[] {
     const events: ParsedEvent[] = [];

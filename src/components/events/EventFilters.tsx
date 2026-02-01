@@ -11,11 +11,13 @@ import {
   AdjustmentsHorizontalIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
+import { CitySelector } from "./CitySelector";
 
 export interface EventFiltersProps {
   onSearchChange?: (query: string) => void;
   onSourceChange?: (sources: string[]) => void;
   onCategoryChange?: (categories: string[]) => void;
+  onCityChange?: (city: string) => void;
   onDateChange?: (startDate?: string, endDate?: string) => void;
   availableCategories?: string[];
   availableSources?: string[];
@@ -43,6 +45,7 @@ export function EventFilters({
   onSearchChange,
   onSourceChange,
   onCategoryChange,
+  onCityChange,
   onDateChange,
   availableCategories = DEFAULT_CATEGORIES,
   availableSources = SOURCES.map((s) => s.value),
@@ -51,10 +54,16 @@ export function EventFilters({
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSources, setSelectedSources] = useState<string[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedCity, setSelectedCity] = useState("All Cities");
 
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
     onSearchChange?.(value);
+  };
+
+  const handleCityChange = (city: string) => {
+    setSelectedCity(city);
+    onCityChange?.(city);
   };
 
   const toggleSource = (source: string) => {
@@ -88,9 +97,9 @@ export function EventFilters({
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 mb-6">
-      {/* Search Bar */}
-      <div className="flex items-center gap-3 mb-4">
-        <div className="relative flex-1">
+      {/* Search Bar and City Selector */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="relative flex-1 min-w-[200px]">
           <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
           <input
             type="text"
@@ -100,6 +109,7 @@ export function EventFilters({
             className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
+        <CitySelector selectedCity={selectedCity} onCityChange={handleCityChange} />
         <button
           onClick={() => setIsExpanded(!isExpanded)}
           className={`p-2 rounded-lg border transition-colors ${

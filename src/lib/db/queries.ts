@@ -54,47 +54,54 @@ export async function getEventSourceBySlug(slug: string): Promise<DbEventSource 
 // ============================================
 
 export async function getEvents(params: EventQueryParams = {}): Promise<DbEvent[]> {
-  let query = supabase
+  // Get all events, prioritizing newly fetched events, then by start time
+  // Note: We don't filter by start_time by default to show all events
+  // Users can filter by date using the UI
+  const { data, error } = await supabase
     .from(TABLES.EVENTS)
     .select("*")
-    .gte("start_time", new Date().toISOString())
+    // Order by fetched_at first (newly fetched events), then by start_time
+    .order("fetched_at", { ascending: false })
     .order("start_time", { ascending: true });
 
+  if (error) throw error;
+  let events = data || [];
+
+  // Apply filters that can't be done in the main query
   // Filter by source
   if (params.sourceId) {
-    query = query.filter("source_id", "eq", params.sourceId);
+    events = events.filter((e) => e.source_id === params.sourceId);
   }
 
   // Filter by category
   if (params.category) {
-    query = query.filter("category", "eq", params.category);
+    events = events.filter((e) => e.category === params.category);
   }
 
   // Filter by virtual status
   if (params.isVirtual !== undefined) {
-    query = query.filter("is_virtual", "eq", params.isVirtual);
+    events = events.filter((e) => e.is_virtual === params.isVirtual);
   }
 
-  // Filter by date range
+  // Filter by date range (only if explicitly requested)
   if (params.startDate) {
-    query = query.gte("start_time", params.startDate);
+    events = events.filter((e) => e.start_time >= params.startDate!);
   }
   if (params.endDate) {
-    query = query.lte("start_time", params.endDate);
+    events = events.filter((e) => e.start_time <= params.endDate!);
   }
 
   // Pagination
   if (params.limit) {
-    query = query.limit(params.limit);
+    events = events.slice(0, params.limit);
   }
   if (params.offset) {
-    query = query.range(params.offset, params.offset + (params.limit || 10) - 1);
+    const start = params.offset;
+    const end = start + (params.limit || 10);
+    events = events.slice(start, end);
   }
 
-  const { data, error } = await query;
-
-  if (error) throw error;
-  return data || [];
+  return events;
 }
 
 export async function getEventById(id: string): Promise<DbEvent | null> {
@@ -402,7 +409,7 @@ export async function getEventsBySource(sourceSlug: string): Promise<DbEvent[]> 
     .from(TABLES.EVENTS)
     .select("*")
     .eq("source_id", source.id)
-    .gte("start_time", new Date().toISOString())
+    .order("fetched_at", { ascending: false })
     .order("start_time", { ascending: true });
 
   if (error) throw error;
@@ -439,7 +446,7 @@ export async function getEventsByCategory(categories: string[]): Promise<DbEvent
     .from(TABLES.EVENTS)
     .select("*")
     .in("category", categories)
-    .gte("start_time", new Date().toISOString())
+    .order("fetched_at", { ascending: false })
     .order("start_time", { ascending: true });
 
   if (error) throw error;
@@ -454,7 +461,7 @@ export async function searchEvents(query: string): Promise<DbEvent[]> {
     .from(TABLES.EVENTS)
     .select("*")
     .or(`title.ilike.%${query}%,description.ilike.%${query}%`)
-    .gte("start_time", new Date().toISOString())
+    .order("fetched_at", { ascending: false })
     .order("start_time", { ascending: true })
     .limit(100);
 
