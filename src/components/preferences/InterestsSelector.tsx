@@ -32,10 +32,12 @@ const SUGGESTED_INTERESTS = [
 
 export interface InterestsSelectorProps {
   onInterestsChange?: (interests: string[]) => void;
+  isActive?: boolean;
 }
 
 export function InterestsSelector({
   onInterestsChange,
+  isActive = true,
 }: InterestsSelectorProps) {
   const { user } = useAuth();
   const [interests, setInterests] = useState<string[]>([]);
@@ -43,12 +45,12 @@ export function InterestsSelector({
   const [newInterest, setNewInterest] = useState("");
   const [message, setMessage] = useState<string | null>(null);
 
-  // Load user's interests
+  // Load user's interests whenever user changes or tab becomes active
   useEffect(() => {
-    if (user) {
+    if (user && isActive) {
       loadInterests();
     }
-  }, [user]);
+  }, [user, isActive]);
 
   const loadInterests = async () => {
     try {

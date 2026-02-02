@@ -33,10 +33,12 @@ export interface TimeDaySelectorProps {
     preferredDays: PreferredDay[];
     preferredTimes: string[];
   }) => void;
+  isActive?: boolean;
 }
 
 export function TimeDaySelector({
   onPreferencesChange,
+  isActive = true,
 }: TimeDaySelectorProps) {
   const { user } = useAuth();
   const [preferredDays, setPreferredDays] = useState<PreferredDay[]>([]);
@@ -44,12 +46,12 @@ export function TimeDaySelector({
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  // Load user's time/day preferences
+  // Load user's time/day preferences whenever user changes or tab becomes active
   useEffect(() => {
-    if (user) {
+    if (user && isActive) {
       loadPreferences();
     }
-  }, [user]);
+  }, [user, isActive]);
 
   const loadPreferences = async () => {
     try {

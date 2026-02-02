@@ -26,9 +26,10 @@ const RADIUS_OPTIONS = [
 
 export interface LocationSelectorProps {
   onLocationChange?: (location: { lat: number; lng: number; radiusKm: number }) => void;
+  isActive?: boolean;
 }
 
-export function LocationSelector({ onLocationChange }: LocationSelectorProps) {
+export function LocationSelector({ onLocationChange, isActive = true }: LocationSelectorProps) {
   const { user } = useAuth();
   const [lat, setLat] = useState("");
   const [lng, setLng] = useState("");
@@ -36,12 +37,12 @@ export function LocationSelector({ onLocationChange }: LocationSelectorProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  // Load user's location preferences
+  // Load user's location preferences whenever user changes or tab becomes active
   useEffect(() => {
-    if (user) {
+    if (user && isActive) {
       loadLocation();
     }
-  }, [user]);
+  }, [user, isActive]);
 
   const loadLocation = async () => {
     try {
