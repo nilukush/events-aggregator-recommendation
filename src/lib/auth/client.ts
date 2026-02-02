@@ -5,7 +5,7 @@
  * For use in Client Components
  */
 
-import { createClient } from "@supabase/supabase-js";
+import { createBrowserClient } from "@supabase/ssr";
 import type {
   AuthUser,
   AuthSession,
@@ -27,22 +27,23 @@ function isBrowser(): boolean {
 }
 
 /**
- * Create Supabase auth client
- * Can be injected for testing
+ * Create Supabase auth client for browser
+ * Uses createBrowserClient from @supabase/ssr for Next.js App Router compatibility
+ * This ensures cookies are used for session storage, matching server-side middleware
  */
 function createAuthClient(): SupabaseClient {
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error("Missing Supabase environment variables");
   }
 
-  return createClient(supabaseUrl, supabaseAnonKey, {
+  return createBrowserClient(supabaseUrl, supabaseAnonKey, {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
       flowType: "pkce", // Use PKCE for better security
     },
-  });
+  }) as SupabaseClient;
 }
 
 // Default client (can be overridden for testing)
