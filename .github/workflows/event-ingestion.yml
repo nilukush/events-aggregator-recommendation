@@ -16,6 +16,7 @@ jobs:
   ingest-events:
     name: Fetch and Store Events
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     # Prevent multiple concurrent runs
     concurrency:
@@ -79,12 +80,27 @@ jobs:
 
           echo "Triggering event ingestion for ${CITY}: ${INGEST_URL}${QUERY}"
 
-          RESPONSE=$(curl -s -X POST "${INGEST_URL}${QUERY}" \
-            -H "Content-Type: application/json" \
-            -w "\n%{http_code}")
+          # Retry logic (up to 3 attempts)
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+          HTTP_CODE=0
 
-          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-          BODY=$(echo "$RESPONSE" | head -n -1)
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ "$HTTP_CODE" -ne 200 ]; do
+            if [ $RETRY_COUNT -gt 0 ]; then
+              echo "Retry $RETRY_COUNT/$MAX_RETRIES for ${CITY}..."
+              sleep 5
+            fi
+
+            RESPONSE=$(curl -s -X POST "${INGEST_URL}${QUERY}" \
+              -H "Content-Type: application/json" \
+              --max-time 60 \
+              -w "\n%{http_code}")
+
+            HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+            BODY=$(echo "$RESPONSE" | head -n -1)
+
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+          done
 
           echo "HTTP Status: $HTTP_CODE"
           echo "Response: $BODY"
@@ -92,7 +108,7 @@ jobs:
           if [ "$HTTP_CODE" -eq 200 ]; then
             echo "Event ingestion completed successfully for ${CITY}"
           else
-            echo "Event ingestion failed for ${CITY} with status code: $HTTP_CODE"
+            echo "Event ingestion failed for ${CITY} after $RETRY_COUNT attempts with status code: $HTTP_CODE"
             # Don't fail the workflow - continue to next city
           fi
         env:

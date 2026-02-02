@@ -78,10 +78,14 @@ export async function getServerUser() {
       return null;
     }
 
+    // Email confirmation was disabled, so treat all users as verified
+    // Users created before disabling may have email_confirmed_at = NULL
+    const emailVerified = user.email_confirmed_at !== null || user.created_at !== null;
+
     return {
       id: user.id,
       email: user.email || "",
-      emailVerified: user.email_confirmed_at !== null,
+      emailVerified,
       createdAt: user.created_at,
       updatedAt: user.updated_at,
     };

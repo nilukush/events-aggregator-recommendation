@@ -108,10 +108,14 @@ function toAuthUser(user: {
   created_at?: string;
   updated_at?: string;
 }): AuthUser {
+  // Email confirmation was disabled, so treat all users as verified
+  // Users created before disabling may have email_confirmed_at = NULL
+  const emailVerified = (user.email_confirmed_at !== null && user.email_confirmed_at !== undefined) || user.created_at !== null;
+
   return {
     id: user.id,
     email: user.email || "",
-    emailVerified: user.email_confirmed_at !== null && user.email_confirmed_at !== undefined,
+    emailVerified,
     createdAt: user.created_at || "",
     updatedAt: user.updated_at || "",
   };
