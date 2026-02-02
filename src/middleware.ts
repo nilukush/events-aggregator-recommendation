@@ -3,6 +3,7 @@
  *
  * Handles authentication for protected routes
  * Redirects unauthenticated users to sign-in page
+ * Follows official Supabase SSR pattern
  */
 
 import { createServerClient } from "@supabase/ssr";
@@ -64,42 +65,6 @@ function isProtectedApiRoute(path: string): boolean {
 }
 
 /**
- * Create Supabase client for middleware
- */
-function createMiddlewareClient(request: NextRequest) {
-  const response = NextResponse.next();
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value;
-        },
-        set(name: string, value: string, options: Record<string, unknown>) {
-          response.cookies.set({
-            name,
-            value,
-            ...options,
-          });
-        },
-        remove(name: string, options: Record<string, unknown>) {
-          response.cookies.set({
-            name,
-            value: "",
-            ...options,
-            maxAge: 0,
-          });
-        },
-      },
-    }
-  );
-
-  return { supabase, response };
-}
-
-/**
  * Middleware function
  */
 export async function middleware(request: NextRequest) {
@@ -114,31 +79,56 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const { supabase, response } = createMiddlewareClient(request);
+  // Create response that will be modified
+  const response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  });
 
-  // Get the user from the request
+  // Create Supabase client with proper cookie handling
+  // CRITICAL: We must set cookies on BOTH request AND response
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return request.cookies.get(name)?.value;
+        },
+        set(name: string, value: string, options: Record<string, unknown>) {
+          // Set on both request and response to properly propagate auth
+          request.cookies.set({
+            name,
+            value,
+            ...options,
+          });
+          response.cookies.set({
+            name,
+            value,
+            ...options,
+          });
+        },
+        remove(name: string, options: Record<string, unknown>) {
+          request.cookies.delete(name);
+          response.cookies.delete(name);
+        },
+      },
+    }
+  );
+
+  // Get the user - this triggers token refresh if needed
   const {
     data: { user },
-    error: userError,
   } = await supabase.auth.getUser();
 
-  // Check if user is authenticated
-  let isAuth = !!user;
-
-  // If getUser failed but not due to auth error, try refreshing the session
-  // This handles edge cases where access token is slightly expired
-  if (!isAuth && !userError) {
-    const { data: { session } } = await supabase.auth.refreshSession();
-    if (session?.user) {
-      isAuth = true;
-    }
-  }
+  const isAuth = !!user;
 
   // Handle protected API routes
   if (isProtectedApiRoute(pathname)) {
     if (!isAuth) {
       return NextResponse.json(
-        { error: "Unauthorized" },
+        { success: false, error: "Unauthorized" },
         { status: 401 }
       );
     }

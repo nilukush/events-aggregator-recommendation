@@ -70,25 +70,21 @@ export default function PreferencesPage() {
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-900 dark:to-gray-800">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header with Navigation */}
-        <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-              Your Preferences
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400">
-              Customize your event discovery experience
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <a
-              href="/"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm"
-            >
-              <HomeIcon className="h-5 w-5" />
-              <span className="hidden sm:inline">Home</span>
-            </a>
-          </div>
+        {/* Header with Back Navigation */}
+        <div className="mb-8">
+          <a
+            href="/"
+            className="inline-flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors mb-4"
+          >
+            <ArrowLeftIcon className="h-5 w-5" />
+            <span>Back to Events</span>
+          </a>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+            Your Preferences
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            Customize your event discovery experience
+          </p>
         </div>
 
         {/* Tabs */}
