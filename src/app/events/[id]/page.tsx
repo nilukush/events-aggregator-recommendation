@@ -36,13 +36,12 @@ interface Event {
 
 async function getEvent(id: string): Promise<Event | null> {
   try {
-    // Use relative URL for server-side fetch - works in both dev and production
-    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
-    const host = process.env.VERCEL_URL
-      ? `${protocol}://${process.env.VERCEL_URL}`
-      : process.env.NEXT_PUBLIC_APP_URL
+    // Prioritize NEXT_PUBLIC_APP_URL over VERCEL_URL for correct URL resolution
+    const host = process.env.NEXT_PUBLIC_APP_URL
       ? process.env.NEXT_PUBLIC_APP_URL
-      : 'http://localhost:3000';
+      : process.env.VERCEL_URL
+        ? `${process.env.NODE_ENV === 'production' ? 'https' : 'http'}://${process.env.VERCEL_URL}`
+        : 'http://localhost:3000';
 
     const response = await fetch(`${host}/api/events/${id}`, {
       cache: "no-store",
@@ -73,13 +72,12 @@ async function getSimilarEvents(
       params.set("categories", category);
     }
 
-    // Use relative URL for server-side fetch - works in both dev and production
-    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
-    const host = process.env.VERCEL_URL
-      ? `${protocol}://${process.env.VERCEL_URL}`
-      : process.env.NEXT_PUBLIC_APP_URL
+    // Prioritize NEXT_PUBLIC_APP_URL over VERCEL_URL for correct URL resolution
+    const host = process.env.NEXT_PUBLIC_APP_URL
       ? process.env.NEXT_PUBLIC_APP_URL
-      : 'http://localhost:3000';
+      : process.env.VERCEL_URL
+        ? `${process.env.NODE_ENV === 'production' ? 'https' : 'http'}://${process.env.VERCEL_URL}`
+        : 'http://localhost:3000';
 
     const response = await fetch(
       `${host}/api/events?${params.toString()}`,

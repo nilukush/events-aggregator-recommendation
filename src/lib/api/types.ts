@@ -60,6 +60,9 @@ export interface EventFilters {
   // Interaction state (requires auth)
   include_bookmarked?: boolean;
   include_hidden?: boolean;
+
+  // Recommendation engine
+  use_recommendations?: boolean;
 }
 
 /**

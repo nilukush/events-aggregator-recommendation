@@ -104,6 +104,9 @@ export function PersonalizedEventList({
       if (prefs) {
         setUsingPersonalization(true);
 
+        // Enable recommendation engine for authenticated users
+        params.set("use_recommendations", "true");
+
         // Only add location filter if not already set by city selector
         if (!city && prefs.location_lat !== null && prefs.location_lng !== null) {
           params.set("lat", prefs.location_lat.toString());

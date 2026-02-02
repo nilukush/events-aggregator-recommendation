@@ -24,6 +24,7 @@ import type {
   EventWithInteractions,
 } from "@/lib/api/types";
 import { isEventBookmarked, isEventHidden } from "@/lib/services/UserPreferencesService";
+import { getRecommendationsForUser } from "@/lib/services/RecommendationEngine";
 
 /**
  * Parse query parameters from request URL
@@ -154,6 +155,9 @@ function parseFilters(searchParams: URLSearchParams): EventFilters {
     filters.include_hidden = includeHidden === "true";
   }
 
+  // Recommendation engine integration
+  const useRecommendations = searchParams.get("use_recommendations") === "true";
+
   return filters;
 }
 
@@ -166,6 +170,7 @@ function parseFilters(searchParams: URLSearchParams): EventFilters {
 export async function GET(request: NextRequest) {
   try {
     const filters = parseFilters(request.nextUrl.searchParams);
+    const useRecommendations = request.nextUrl.searchParams.get("use_recommendations") === "true";
     const user = await getServerUser();
 
     // Build base query with join to event_sources
@@ -266,6 +271,26 @@ export async function GET(request: NextRequest) {
       events = events.filter((e) => !hiddenEventIds.has(e.id));
     }
 
+    // Apply recommendation scores if enabled and user is authenticated
+    let recommendationScores: Map<string, number> | null = null;
+    if (useRecommendations && user) {
+      try {
+        const recommendations = await getRecommendationsForUser(user.id, {
+          limit: events.length * 2,
+          excludeSeen: false,
+          excludeBookmarked: false,
+        });
+
+        // Create score map for O(1) lookup
+        recommendationScores = new Map(
+          recommendations.recommendations.map(r => [r.event_id, r.score])
+        );
+      } catch (error) {
+        console.warn("Recommendation engine failed, using basic sorting:", error);
+        // Fall back to basic filtering
+      }
+    }
+
     // Sort events
     const sortBy = filters.sort_by || "date";
     const sortOrder = filters.sort_order || "asc";
@@ -273,6 +298,17 @@ export async function GET(request: NextRequest) {
     events.sort((a, b) => {
       let comparison = 0;
 
+      // Priority 1: Recommendation score (if available)
+      if (recommendationScores && recommendationScores.size > 0) {
+        const aScore = recommendationScores.get(a.id) || 0;
+        const bScore = recommendationScores.get(b.id) || 0;
+        if (aScore !== bScore) {
+          comparison = bScore - aScore;
+          return sortOrder === "asc" ? -comparison : comparison;
+        }
+      }
+
+      // Priority 2: Sort by selected criteria
       switch (sortBy) {
         case "date":
           comparison =

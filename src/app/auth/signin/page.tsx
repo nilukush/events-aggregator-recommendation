@@ -44,7 +44,9 @@ function SignInForm() {
       const result = await signIn({ email, password });
 
       if (result.success) {
-        router.push(redirectTo);
+        // Use window.location.href for full page reload to ensure cookies are synchronized
+        // This prevents race condition between client auth state and server middleware
+        window.location.href = redirectTo;
       } else {
         setError(result.error || "Failed to sign in. Please check your credentials.");
       }
