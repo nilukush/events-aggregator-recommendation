@@ -33,16 +33,6 @@ function SignUpForm() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  // Redirect if already authenticated (only on initial mount, not after sign-up)
-  // We use a ref to track if this is the initial mount to avoid redirect loops
-  React.useEffect(() => {
-    if (isAuthenticated && !isLoading) {
-      // Use window.location.href for full page reload to ensure cookies are synchronized
-      // This prevents race condition between client auth state and server middleware
-      window.location.href = redirectTo;
-    }
-  }, [isAuthenticated, isLoading, redirectTo]);
-
   const validateForm = (): boolean => {
     if (!email || !password || !confirmPassword) {
       setError("All fields are required.");
