@@ -34,6 +34,7 @@ export function LocationSelector({ onLocationChange }: LocationSelectorProps) {
   const [lng, setLng] = useState("");
   const [radiusKm, setRadiusKm] = useState("25");
   const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // Load user's location preferences
   useEffect(() => {
@@ -94,6 +95,7 @@ export function LocationSelector({ onLocationChange }: LocationSelectorProps) {
     }
 
     setIsLoading(true);
+    setMessage(null);
     try {
       const response = await fetch("/api/user/preferences", {
         method: "PUT",
@@ -108,12 +110,25 @@ export function LocationSelector({ onLocationChange }: LocationSelectorProps) {
       });
 
       if (response.ok) {
-        onLocationChange?.({
-          lat: latNum,
-          lng: lngNum,
-          radiusKm: radiusNum,
-        });
+        const data = await response.json();
+        if (data.success) {
+          setMessage({ type: "success", text: "Location preferences saved!" });
+          onLocationChange?.({
+            lat: latNum,
+            lng: lngNum,
+            radiusKm: radiusNum,
+          });
+          // Clear message after 3 seconds
+          setTimeout(() => setMessage(null), 3000);
+        } else {
+          setMessage({ type: "error", text: data.error || "Failed to save preferences" });
+        }
+      } else {
+        const errorData = await response.json();
+        setMessage({ type: "error", text: errorData.error || "Failed to save" });
       }
+    } catch (err) {
+      setMessage({ type: "error", text: "Network error. Please try again." });
     } finally {
       setIsLoading(false);
     }
@@ -217,14 +232,25 @@ export function LocationSelector({ onLocationChange }: LocationSelectorProps) {
       </div>
 
       {/* Save Button */}
-      <Button
-        onClick={saveLocation}
-        isLoading={isLoading}
-        disabled={!lat || !lng}
-        className="w-full"
-      >
-        Save Location Preferences
-      </Button>
+      <div className="space-y-3">
+        {message && (
+          <div className={`p-3 rounded-lg text-sm text-center ${
+            message.type === "success"
+              ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300"
+              : "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300"
+          }`}>
+            {message.text}
+          </div>
+        )}
+        <Button
+          onClick={saveLocation}
+          isLoading={isLoading}
+          disabled={!lat || !lng}
+          className="w-full"
+        >
+          Save Location Preferences
+        </Button>
+      </div>
     </div>
   );
 }

@@ -41,6 +41,7 @@ export function TimeDaySelector({
   const [preferredDays, setPreferredDays] = useState<number[]>([]);
   const [preferredTimes, setPreferredTimes] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // Load user's time/day preferences
   useEffect(() => {
@@ -84,6 +85,7 @@ export function TimeDaySelector({
 
   const savePreferences = async () => {
     setIsLoading(true);
+    setMessage(null);
     try {
       const response = await fetch("/api/user/preferences", {
         method: "PUT",
@@ -97,11 +99,24 @@ export function TimeDaySelector({
       });
 
       if (response.ok) {
-        onPreferencesChange?.({
-          preferredDays,
-          preferredTimes,
-        });
+        const data = await response.json();
+        if (data.success) {
+          setMessage({ type: "success", text: "Preferences saved successfully!" });
+          onPreferencesChange?.({
+            preferredDays,
+            preferredTimes,
+          });
+          // Clear message after 3 seconds
+          setTimeout(() => setMessage(null), 3000);
+        } else {
+          setMessage({ type: "error", text: data.error || "Failed to save preferences" });
+        }
+      } else {
+        const errorData = await response.json();
+        setMessage({ type: "error", text: errorData.error || "Failed to save" });
       }
+    } catch (err) {
+      setMessage({ type: "error", text: "Network error. Please try again." });
     } finally {
       setIsLoading(false);
     }
@@ -234,6 +249,17 @@ export function TimeDaySelector({
                 .join(", ")}
             </p>
           )}
+        </div>
+      )}
+
+      {/* Success/Error Message */}
+      {message && (
+        <div className={`p-3 rounded-lg text-sm text-center ${
+          message.type === "success"
+            ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300"
+            : "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300"
+        }`}>
+          {message.text}
         </div>
       )}
 

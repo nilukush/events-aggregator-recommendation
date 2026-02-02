@@ -41,6 +41,7 @@ export function InterestsSelector({
   const [interests, setInterests] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [newInterest, setNewInterest] = useState("");
+  const [message, setMessage] = useState<string | null>(null);
 
   // Load user's interests
   useEffect(() => {
@@ -68,6 +69,7 @@ export function InterestsSelector({
     }
 
     setIsLoading(true);
+    setMessage(null);
     try {
       const response = await fetch("/api/user/interests", {
         method: "POST",
@@ -80,8 +82,18 @@ export function InterestsSelector({
         if (data.success && data.data?.interests) {
           setInterests(data.data.interests);
           onInterestsChange?.(data.data.interests);
+          setMessage(`Added "${interest}" to your interests!`);
+          // Clear message after 2 seconds
+          setTimeout(() => setMessage(null), 2000);
+        } else {
+          setMessage(data.error || "Failed to add interest");
         }
+      } else {
+        const errorData = await response.json();
+        setMessage(errorData.error || "Failed to add interest");
       }
+    } catch (err) {
+      setMessage("Network error. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -184,6 +196,17 @@ export function InterestsSelector({
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Feedback Message */}
+      {message && (
+        <div className={`p-3 rounded-lg text-sm text-center ${
+          message.includes("Added")
+            ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
+            : "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300"
+        }`}>
+          {message}
         </div>
       )}
     </div>
