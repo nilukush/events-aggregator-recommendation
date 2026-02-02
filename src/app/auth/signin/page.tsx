@@ -28,12 +28,15 @@ function SignInForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated (only on initial mount, not after sign-in)
+  // We use a ref to track if this is the initial mount to avoid redirect loops
   React.useEffect(() => {
-    if (isAuthenticated) {
-      router.push(redirectTo);
+    if (isAuthenticated && !isLoading) {
+      // Use window.location.href for full page reload to ensure cookies are synchronized
+      // This prevents race condition between client auth state and server middleware
+      window.location.href = redirectTo;
     }
-  }, [isAuthenticated, redirectTo, router]);
+  }, [isAuthenticated, isLoading, redirectTo]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
