@@ -36,8 +36,15 @@ interface Event {
 
 async function getEvent(id: string): Promise<Event | null> {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-    const response = await fetch(`${baseUrl}/api/events/${id}`, {
+    // Use relative URL for server-side fetch - works in both dev and production
+    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+    const host = process.env.VERCEL_URL
+      ? `${protocol}://${process.env.VERCEL_URL}`
+      : process.env.NEXT_PUBLIC_APP_URL
+      ? process.env.NEXT_PUBLIC_APP_URL
+      : 'http://localhost:3000';
+
+    const response = await fetch(`${host}/api/events/${id}`, {
       cache: "no-store",
     });
 
@@ -66,9 +73,16 @@ async function getSimilarEvents(
       params.set("categories", category);
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    // Use relative URL for server-side fetch - works in both dev and production
+    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+    const host = process.env.VERCEL_URL
+      ? `${protocol}://${process.env.VERCEL_URL}`
+      : process.env.NEXT_PUBLIC_APP_URL
+      ? process.env.NEXT_PUBLIC_APP_URL
+      : 'http://localhost:3000';
+
     const response = await fetch(
-      `${baseUrl}/api/events?${params.toString()}`,
+      `${host}/api/events?${params.toString()}`,
       { cache: "no-store" }
     );
 

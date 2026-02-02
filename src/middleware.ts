@@ -142,8 +142,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(signInUrl);
   }
 
-  // Redirect authenticated users away from auth pages to home
+  // Redirect authenticated users away from auth pages
   if (isAuth && (pathname.startsWith("/auth/signin") || pathname.startsWith("/auth/signup"))) {
+    // Check if there's a redirectTo parameter
+    const redirectTo = request.nextUrl.searchParams.get("redirectTo");
+    if (redirectTo) {
+      return NextResponse.redirect(new URL(redirectTo, request.url));
+    }
     return NextResponse.redirect(new URL("/", request.url));
   }
 
