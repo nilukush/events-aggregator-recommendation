@@ -9,15 +9,16 @@ import React, { useState, useEffect } from "react";
 import { ClockIcon } from "@heroicons/react/24/outline";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { Button } from "../ui/Button";
+import type { PreferredDay } from "@/lib/db/schema";
 
 const DAYS_OF_WEEK = [
-  { value: 0, label: "Sunday" },
-  { value: 1, label: "Monday" },
-  { value: 2, label: "Tuesday" },
-  { value: 3, label: "Wednesday" },
-  { value: 4, label: "Thursday" },
-  { value: 5, label: "Friday" },
-  { value: 6, label: "Saturday" },
+  { value: "sunday" as const, label: "Sunday" },
+  { value: "monday" as const, label: "Monday" },
+  { value: "tuesday" as const, label: "Tuesday" },
+  { value: "wednesday" as const, label: "Wednesday" },
+  { value: "thursday" as const, label: "Thursday" },
+  { value: "friday" as const, label: "Friday" },
+  { value: "saturday" as const, label: "Saturday" },
 ];
 
 const TIME_SLOTS = [
@@ -29,7 +30,7 @@ const TIME_SLOTS = [
 
 export interface TimeDaySelectorProps {
   onPreferencesChange?: (preferences: {
-    preferredDays: number[];
+    preferredDays: PreferredDay[];
     preferredTimes: string[];
   }) => void;
 }
@@ -38,7 +39,7 @@ export function TimeDaySelector({
   onPreferencesChange,
 }: TimeDaySelectorProps) {
   const { user } = useAuth();
-  const [preferredDays, setPreferredDays] = useState<number[]>([]);
+  const [preferredDays, setPreferredDays] = useState<PreferredDay[]>([]);
   const [preferredTimes, setPreferredTimes] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -69,10 +70,10 @@ export function TimeDaySelector({
     }
   };
 
-  const toggleDay = (dayValue: number) => {
+  const toggleDay = (dayValue: PreferredDay) => {
     const newDays = preferredDays.includes(dayValue)
       ? preferredDays.filter((d) => d !== dayValue)
-      : [...preferredDays, dayValue].sort((a, b) => a - b);
+      : [...preferredDays, dayValue];
     setPreferredDays(newDays);
   };
 
@@ -91,10 +92,8 @@ export function TimeDaySelector({
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          timeDay: {
-            preferredDays,
-            preferredTimes,
-          },
+          preferred_days: preferredDays,
+          preferred_times: preferredTimes,
         }),
       });
 
@@ -123,15 +122,15 @@ export function TimeDaySelector({
   };
 
   const selectWeekdays = () => {
-    setPreferredDays([1, 2, 3, 4, 5]);
+    setPreferredDays(["monday", "tuesday", "wednesday", "thursday", "friday"]);
   };
 
   const selectWeekends = () => {
-    setPreferredDays([0, 6]);
+    setPreferredDays(["sunday", "saturday"]);
   };
 
   const selectAllDays = () => {
-    setPreferredDays([0, 1, 2, 3, 4, 5, 6]);
+    setPreferredDays(["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]);
   };
 
   const selectAllTimes = () => {
@@ -238,7 +237,7 @@ export function TimeDaySelector({
           {preferredDays.length > 0 && (
             <p className="text-xs text-blue-600 dark:text-blue-400 mb-1">
               Preferred:{" "}
-              {preferredDays.map((d) => DAYS_OF_WEEK[d].label).join(", ")}
+              {preferredDays.map((d) => DAYS_OF_WEEK.find((day) => day.value === d)?.label || d).join(", ")}
             </p>
           )}
           {preferredTimes.length > 0 && (

@@ -8,18 +8,14 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getServerUser } from "@/lib/auth/server-client";
-import {
-  getUserPreferences,
-  updateUserPreferences,
-  deleteUserPreferences,
-  addInterest,
-  removeInterest,
-  setLocationPreference,
-  setPreferredDays,
-  setPreferredTimes,
-} from "@/lib/services/UserPreferencesService";
+import { getServerDbClient } from "@/lib/db/server";
+import { deleteUserPreferences } from "@/lib/services/UserPreferencesService";
 import type { ApiResponse, UpdatePreferencesRequest } from "@/lib/api/types";
 import type { DbUserPreference } from "@/lib/db/schema";
+import {
+  getUserPreferences as getDbUserPreferences,
+  upsertUserPreferences,
+} from "@/lib/db/queries";
 
 /**
  * GET /api/user/preferences
@@ -38,7 +34,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(errorResponse, { status: 401 });
     }
 
-    const preferences = await getUserPreferences(user.id);
+    // Use server client with auth context for RLS
+    const client = await getServerDbClient();
+    const preferences = await getDbUserPreferences(user.id, client);
 
     const response: ApiResponse<DbUserPreference | null> = {
       success: true,
@@ -76,27 +74,37 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json(errorResponse, { status: 401 });
     }
 
+    // Use server client with auth context for RLS
+    const client = await getServerDbClient();
     const body: UpdatePreferencesRequest = await request.json();
 
     // Update preferences based on what's provided
-    let preferences = await getUserPreferences(user.id);
+    let preferences = await getDbUserPreferences(user.id, client);
 
-    if (body.interests) {
-      preferences = await updateUserPreferences(user.id, {
-        interests: body.interests,
-      });
-    }
+    // Build update object with only provided fields
+    const updates: Partial<DbUserPreference> = {};
 
     if (body.location) {
-      preferences = await setLocationPreference(user.id, body.location);
+      updates.location_lat = body.location.lat;
+      updates.location_lng = body.location.lng;
+      updates.location_radius_km = body.location.radiusKm;
     }
 
     if (body.preferred_days) {
-      preferences = await setPreferredDays(user.id, body.preferred_days);
+      updates.preferred_days = body.preferred_days;
     }
 
     if (body.preferred_times) {
-      preferences = await setPreferredTimes(user.id, body.preferred_times);
+      updates.preferred_times = body.preferred_times;
+    }
+
+    if (body.interests) {
+      updates.interests = body.interests;
+    }
+
+    // Only upsert if there are updates
+    if (Object.keys(updates).length > 0) {
+      preferences = await upsertUserPreferences(user.id, updates, client);
     }
 
     const response: ApiResponse<DbUserPreference | null> = {

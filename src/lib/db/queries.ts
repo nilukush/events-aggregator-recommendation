@@ -4,6 +4,7 @@
  */
 
 import { supabase } from "../supabase";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   DbEvent,
   DbEventInsert,
@@ -217,8 +218,12 @@ export async function getNearbyEvents(params: NearbyEventsParams): Promise<DbEve
 // User Preferences Queries
 // ============================================
 
-export async function getUserPreferences(userId: string): Promise<DbUserPreference | null> {
-  const { data, error } = await supabase
+export async function getUserPreferences(
+  userId: string,
+  client?: SupabaseClient
+): Promise<DbUserPreference | null> {
+  const db = client || supabase;
+  const { data, error } = await db
     .from(TABLES.USER_PREFERENCES)
     .select("*")
     .eq("user_id", userId)
@@ -233,9 +238,11 @@ export async function getUserPreferences(userId: string): Promise<DbUserPreferen
 
 export async function upsertUserPreferences(
   userId: string,
-  preferences: Partial<DbUserPreference>
+  preferences: Partial<DbUserPreference>,
+  client?: SupabaseClient
 ): Promise<DbUserPreference> {
-  const { data, error } = await supabase
+  const db = client || supabase;
+  const { data, error } = await db
     .from(TABLES.USER_PREFERENCES)
     .upsert({ user_id: userId, ...preferences })
     .select()

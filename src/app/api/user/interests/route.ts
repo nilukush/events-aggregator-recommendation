@@ -7,9 +7,11 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getServerUser } from "@/lib/auth/server-client";
+import { getServerDbClient } from "@/lib/db/server";
 import { addInterest, removeInterest } from "@/lib/services/UserPreferencesService";
 import type { ApiResponse } from "@/lib/api/types";
 import type { DbUserPreference } from "@/lib/db/schema";
+import { getUserPreferences, upsertUserPreferences } from "@/lib/db/queries";
 
 /**
  * POST /api/user/interests
@@ -39,11 +41,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(errorResponse, { status: 400 });
     }
 
-    const preferences = await addInterest(user.id, interest);
+    // Use server client with auth context for RLS
+    const client = await getServerDbClient();
+    const existing = await getUserPreferences(user.id, client);
+    const interests = existing?.interests || [];
+
+    // Avoid duplicates
+    if (interests.includes(interest)) {
+      const response: ApiResponse<DbUserPreference | null> = {
+        success: true,
+        data: existing || null,
+      };
+      return NextResponse.json(response);
+    }
+
+    const updated = await upsertUserPreferences(
+      user.id,
+      {
+        interests: [...interests, interest],
+        // Preserve existing data
+        location_lat: existing?.location_lat,
+        location_lng: existing?.location_lng,
+        location_radius_km: existing?.location_radius_km,
+        preferred_days: existing?.preferred_days,
+        preferred_times: existing?.preferred_times,
+      },
+      client
+    );
 
     const response: ApiResponse<DbUserPreference | null> = {
       success: true,
-      data: preferences,
+      data: updated,
     };
 
     return NextResponse.json(response);
@@ -88,11 +116,37 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json(errorResponse, { status: 400 });
     }
 
-    const preferences = await removeInterest(user.id, interest);
+    // Use server client with auth context for RLS
+    const client = await getServerDbClient();
+    const existing = await getUserPreferences(user.id, client);
+
+    if (!existing) {
+      const response: ApiResponse<DbUserPreference | null> = {
+        success: true,
+        data: null,
+      };
+      return NextResponse.json(response);
+    }
+
+    const interests = existing.interests?.filter((i) => i !== interest) || [];
+
+    const updated = await upsertUserPreferences(
+      user.id,
+      {
+        interests,
+        // Preserve existing data
+        location_lat: existing.location_lat,
+        location_lng: existing.location_lng,
+        location_radius_km: existing.location_radius_km,
+        preferred_days: existing.preferred_days,
+        preferred_times: existing.preferred_times,
+      },
+      client
+    );
 
     const response: ApiResponse<DbUserPreference | null> = {
       success: true,
-      data: preferences,
+      data: updated,
     };
 
     return NextResponse.json(response);
