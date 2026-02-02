@@ -119,10 +119,20 @@ export async function middleware(request: NextRequest) {
   // Get the user from the request
   const {
     data: { user },
+    error: userError,
   } = await supabase.auth.getUser();
 
   // Check if user is authenticated
-  const isAuth = !!user;
+  let isAuth = !!user;
+
+  // If getUser failed but not due to auth error, try refreshing the session
+  // This handles edge cases where access token is slightly expired
+  if (!isAuth && !userError) {
+    const { data: { session } } = await supabase.auth.refreshSession();
+    if (session?.user) {
+      isAuth = true;
+    }
+  }
 
   // Handle protected API routes
   if (isProtectedApiRoute(pathname)) {

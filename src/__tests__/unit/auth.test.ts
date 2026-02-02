@@ -379,6 +379,48 @@ describe("Auth - Client", () => {
     });
   });
 
+  describe("toAuthUser - Email Verification Logic", () => {
+    const legacyUserNoEmailConfirmation = {
+      id: "legacy-user-123",
+      email: "legacy@example.com",
+      email_confirmed_at: null, // User created before email confirmation was disabled
+      created_at: "2024-01-01T00:00:00Z",
+      updated_at: "2024-01-01T00:00:00Z",
+    };
+
+    const verifiedUserWithEmailConfirmation = {
+      id: "verified-user-123",
+      email: "verified@example.com",
+      email_confirmed_at: "2024-01-01T00:00:00Z",
+      created_at: "2024-01-01T00:00:00Z",
+      updated_at: "2024-01-01T00:00:00Z",
+    };
+
+    it("should treat users with created_at as verified even if email_confirmed_at is null", async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({
+        data: { user: legacyUserNoEmailConfirmation },
+        error: null,
+      });
+
+      const user = await getCurrentUser();
+
+      expect(user?.emailVerified).toBe(true);
+      expect(user?.id).toBe("legacy-user-123");
+    });
+
+    it("should treat users with email_confirmed_at as verified", async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({
+        data: { user: verifiedUserWithEmailConfirmation },
+        error: null,
+      });
+
+      const user = await getCurrentUser();
+
+      expect(user?.emailVerified).toBe(true);
+      expect(user?.id).toBe("verified-user-123");
+    });
+  });
+
   describe("resetPassword", () => {
     it("should send password reset email", async () => {
       mockSupabase.auth.resetPasswordForEmail.mockResolvedValue({

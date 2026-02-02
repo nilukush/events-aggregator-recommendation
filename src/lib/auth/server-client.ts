@@ -110,6 +110,10 @@ export async function getServerSession() {
       return null;
     }
 
+    // Email confirmation was disabled, so treat all users as verified
+    // Users created before disabling may have email_confirmed_at = NULL
+    const emailVerified = (session.user.email_confirmed_at !== null) || session.user.created_at !== null;
+
     return {
       accessToken: session.access_token,
       refreshToken: session.refresh_token || "",
@@ -117,7 +121,7 @@ export async function getServerSession() {
       user: {
         id: session.user.id,
         email: session.user.email || "",
-        emailVerified: session.user.email_confirmed_at !== null,
+        emailVerified,
         createdAt: session.user.created_at,
         updatedAt: session.user.updated_at,
       },
