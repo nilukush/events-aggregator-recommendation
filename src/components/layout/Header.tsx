@@ -47,7 +47,7 @@ export function Header() {
               <span>EventNexus</span>
             </Link>
 
-            {/* Desktop Navigation */}
+            {/* Desktop Navigation - just Discover Events */}
             <nav className="hidden md:flex items-center gap-6">
               <Link
                 href="/"
@@ -55,20 +55,6 @@ export function Header() {
               >
                 Discover Events
               </Link>
-              <Link
-                href="/preferences"
-                className="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-medium"
-              >
-                Preferences
-              </Link>
-              {isAuthenticated && (
-                <Link
-                  href="/account"
-                  className="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-medium"
-                >
-                  Account
-                </Link>
-              )}
             </nav>
           </div>
 
