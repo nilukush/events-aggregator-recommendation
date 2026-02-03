@@ -251,6 +251,46 @@ npm run test:watch       # Watch mode for tests
 - **Test Suites:** 11 passed
 - **Tests:** 222 passing
 
+## Recent Updates
+
+### UI/UX Improvements
+- **Global Header**: Added consistent navigation across all pages
+- **Account Page**: New `/account` page for user profile and preferences management
+- **City Display**: Events now show city badges based on coordinates (40+ cities supported)
+- **Simplified Navigation**: Removed redundant nav links for cleaner UX
+
+### Personalization System
+- **Recommendation Engine**: Content-based filtering with 4 factors:
+  - Interest matching (40%): Compares user interests to event tags/category
+  - Location proximity (30%): Distance-based scoring using Haversine formula
+  - Day/time preferences (20%): Matches preferred days and time slots
+  - Event timing (10%): Prioritizes upcoming events (1-7 days optimal)
+- **Min Score Threshold**: 0.1 (includes events with weak matches)
+- **Max Recommendations**: 50 events per request
+- **Smart Filtering**: Skips hard filters when recommendations enabled, uses scoring instead
+
+### How Personalization Works
+
+1. **Interest Matching**:
+   - Checks event `tags` and `category` against user interests
+   - Case-insensitive partial matching
+   - Score: `0.3 + (matches × 0.35)` up to 1.0
+
+2. **Location Scoring**:
+   - Calculates distance using Haversine formula
+   - Within 25% radius = 100%, within 50% = 80%, within radius = 60%
+   - Events without location get neutral 50% score
+
+3. **Day/Time Matching**:
+   - Checks event day against `preferred_days`
+   - Checks event hour against `preferred_times` (morning/afternoon/evening)
+   - Base 50%, +25% for matches, -10% for non-matching days
+
+4. **Final Score**:
+   - Weighted sum of all factors
+   - Events sorted by score (highest first)
+   - Only events with score > 10% are shown
+
 ## Sources
 
 - [PostGIS: Geo queries | Supabase Docs](https://supabase.com/docs/guides/database/extensions/postgis)
