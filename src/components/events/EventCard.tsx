@@ -52,10 +52,13 @@ export function EventCard({
   const endDate = event.end_time ? new Date(event.end_time) : null;
   const timeUntilEvent = formatDistanceToNow(eventDate, { addSuffix: true });
 
-  // Extract city from location name, or use coordinates if location_name is not available
-  let city = extractCity(event.location_name);
-  if (!city && event.location_lat && event.location_lng) {
+  // Extract city from coordinates first (more accurate), then fall back to location name
+  let city = null;
+  if (event.location_lat && event.location_lng) {
     city = getCityFromCoordinates(event.location_lat, event.location_lng);
+  }
+  if (!city) {
+    city = extractCity(event.location_name);
   }
 
   const formatEventTime = (date: Date) => {

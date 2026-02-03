@@ -254,10 +254,16 @@ npm run test:watch       # Watch mode for tests
 ## Recent Updates
 
 ### UI/UX Improvements
-- **Global Header**: Added consistent navigation across all pages
+- **Global Header**: Added consistent navigation across all pages (via root layout)
 - **Account Page**: New `/account` page for user profile and preferences management
 - **City Display**: Events now show city badges based on coordinates (40+ cities supported)
 - **Simplified Navigation**: Removed redundant nav links for cleaner UX
+- **City Detection Priority**: Coordinates are now checked first for city badges (more accurate), falling back to location name parsing
+
+### Bug Fixes (Jan 2026)
+- **Duplicate Header Fixed**: Removed duplicate `<Header />` from account page - now uses global header from root layout only
+- **Personalization Indicators Fixed**: Added `match_score` and `match_reasons` fields to `Event` interface in `PersonalizedEventList.tsx` - recommendation scores now display correctly on event cards when authenticated
+- **City Badge Accuracy**: Improved city detection by prioritizing coordinate-based lookup over text parsing (fixes false positives like "Bangalore" on Dubai events)
 
 ### Personalization System
 - **Recommendation Engine**: Content-based filtering with 4 factors:

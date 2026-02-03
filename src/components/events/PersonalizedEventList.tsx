@@ -33,6 +33,8 @@ interface Event {
   is_hidden?: boolean;
   source_name?: string;
   source_slug?: string;
+  match_score?: number;
+  match_reasons?: string[];
 }
 
 interface PersonalizedEventListProps {
