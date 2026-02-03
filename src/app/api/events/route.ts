@@ -275,6 +275,7 @@ export async function GET(request: NextRequest) {
 
     // Apply recommendation scores if enabled and user is authenticated
     let recommendationScores: Map<string, number> | null = null;
+    let recommendationReasons: Map<string, string> | null = null;
     if (useRecommendations && user) {
       try {
         const recommendations = await getRecommendationsForUser(user.id, {
@@ -283,9 +284,12 @@ export async function GET(request: NextRequest) {
           excludeBookmarked: false,
         });
 
-        // Create score map for O(1) lookup
+        // Create score and reason maps for O(1) lookup
         recommendationScores = new Map(
           recommendations.recommendations.map(r => [r.event_id, r.score])
+        );
+        recommendationReasons = new Map(
+          recommendations.recommendations.map(r => [r.event_id, r.reason || ""])
         );
       } catch (error) {
         console.warn("Recommendation engine failed, using basic sorting:", error);
@@ -348,6 +352,21 @@ export async function GET(request: NextRequest) {
         source_name: event_sources?.name,
         source_slug: event_sources?.slug,
       };
+
+      // Add recommendation score and reasons if available
+      if (recommendationScores) {
+        const score = recommendationScores.get(event.id);
+        if (score !== undefined) {
+          eventWithInteractions.match_score = score;
+        }
+      }
+      if (recommendationReasons) {
+        const reason = recommendationReasons.get(event.id);
+        if (reason) {
+          // Parse comma-separated reasons into array
+          eventWithInteractions.match_reasons = reason.split(', ').map(r => r.trim()).filter(Boolean);
+        }
+      }
 
       if (user) {
         eventWithInteractions.is_bookmarked = await isEventBookmarked(

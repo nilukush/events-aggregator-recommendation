@@ -34,6 +34,8 @@ export interface EventCardProps {
     is_hidden?: boolean;
     source_name?: string;
     source_slug?: string;
+    match_score?: number;
+    match_reasons?: string[];
   };
   onBookmark?: (eventId: string) => void;
   onClick?: (eventId: string) => void;
@@ -84,7 +86,11 @@ export function EventCard({
   return (
     <div
       onClick={handleCardClick}
-      className="bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-lg transition-shadow cursor-pointer overflow-hidden group"
+      className={`bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-lg transition-all cursor-pointer overflow-hidden group ${
+        event.match_score !== undefined && event.match_score >= 0.7
+          ? 'ring-2 ring-green-400 dark:ring-green-600 ring-opacity-50'
+          : ''
+      }`}
     >
       {/* Event Image */}
       {event.image_url ? (
@@ -207,6 +213,41 @@ export function EventCard({
               <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 text-xs rounded-full">
                 +{event.tags.length - 3}
               </span>
+            )}
+          </div>
+        )}
+
+        {/* Match Indicators */}
+        {event.match_score !== undefined && event.match_score > 0 && (
+          <div className="mb-3 space-y-2">
+            {/* Match Score Badge */}
+            <div className="flex items-center gap-2">
+              <div className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                event.match_score >= 0.7
+                  ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                  : event.match_score >= 0.5
+                  ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+              }`}>
+                {Math.round(event.match_score * 100)}% match
+              </div>
+            </div>
+
+            {/* Match Reasons */}
+            {event.match_reasons && event.match_reasons.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {event.match_reasons.slice(0, 2).map((reason, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 text-xs rounded-full"
+                  >
+                    <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    {reason}
+                  </span>
+                ))}
+              </div>
             )}
           </div>
         )}

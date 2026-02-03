@@ -80,6 +80,9 @@ export interface EventWithInteractions extends Omit<DbEvent, 'source_id'> {
   is_bookmarked?: boolean;
   is_hidden?: boolean;
   interaction_count?: number;
+  // Recommendation data (when using recommendations)
+  match_score?: number;  // 0-1, recommendation confidence
+  match_reasons?: string[];  // e.g., ["matches your interests", "near your location"]
 }
 
 /**
