@@ -70,15 +70,8 @@ export default function PreferencesPage() {
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-900 dark:to-gray-800">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header with Back Navigation */}
+        {/* Page Header */}
         <div className="mb-8">
-          <a
-            href="/"
-            className="inline-flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors mb-4"
-          >
-            <ArrowLeftIcon className="h-5 w-5" />
-            <span>Back to Events</span>
-          </a>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
             Your Preferences
           </h1>

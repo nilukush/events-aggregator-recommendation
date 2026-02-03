@@ -280,8 +280,8 @@ async function contentBasedFiltering(
 
     const finalScore = scoreCount > 0 ? totalScore : 0;
 
-    if (finalScore > 0.3) {
-      // Only include events with meaningful scores
+    if (finalScore > 0.1) {
+      // Lower threshold from 0.3 to 0.1 - include more events with even weak matches
       scores.push({
         eventId: event.id,
         score: Math.min(1, finalScore),
@@ -294,7 +294,7 @@ async function contentBasedFiltering(
   // Sort by score descending
   scores.sort((a, b) => b.score - a.score);
 
-  return scores.slice(0, options.limit || 20);
+  return scores.slice(0, options.limit || 50); // Increase from 20 to 50
 }
 
 // ============================================

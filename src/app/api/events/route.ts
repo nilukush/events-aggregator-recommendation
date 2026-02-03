@@ -228,7 +228,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Filter by location using nearby events function
-    if (filters.lat !== undefined && filters.lng !== undefined) {
+    // SKIP hard location filter when recommendations are enabled - let recommendation engine score by distance instead
+    if (filters.lat !== undefined && filters.lng !== undefined && !useRecommendations) {
       const { data: nearbyEvents } = await supabase.rpc("get_nearby_events", {
         lat: filters.lat,
         lng: filters.lng,
@@ -247,7 +248,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Filter by interests (matches event tags or category)
-    if (filters.interests && filters.interests.length > 0) {
+    // SKIP hard interest filter when recommendations are enabled - let recommendation engine score by interests instead
+    if (filters.interests && filters.interests.length > 0 && !useRecommendations) {
       events = events.filter((event) => {
         const eventTags = event.tags || [];
         const eventCategory = event.category;
