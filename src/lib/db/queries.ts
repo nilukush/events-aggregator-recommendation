@@ -244,7 +244,10 @@ export async function upsertUserPreferences(
   const db = client || supabase;
   const { data, error } = await db
     .from(TABLES.USER_PREFERENCES)
-    .upsert({ user_id: userId, ...preferences })
+    .upsert({ user_id: userId, ...preferences }, {
+      onConflict: 'user_id',  // Use user_id as the unique constraint for upsert
+      ignoreDuplicates: false,
+    })
     .select()
     .single();
 
