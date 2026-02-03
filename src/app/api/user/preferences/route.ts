@@ -115,6 +115,10 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json(response);
   } catch (error) {
     console.error("Error updating preferences:", error);
+    console.error("Error details:", {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
 
     const errorResponse: ApiResponse = {
       success: false,

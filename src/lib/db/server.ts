@@ -54,7 +54,20 @@ export async function getServerDbClient(): Promise<SupabaseClient> {
     throw new Error("Missing Supabase environment variables");
   }
 
-  return createServerClient(url, key, {
+  const client = createServerClient(url, key, {
     cookies: cookieOptions,
   }) as SupabaseClient;
+
+  // CRITICAL: Call getSession to load auth context from cookies
+  // This is required for RLS policies to work - it triggers the client
+  // to read the session from cookies and set up the internal auth state
+  // Without this, auth.uid() will always return null in RLS policies
+  const { data: { session } } = await client.auth.getSession();
+
+  // Log session info for debugging
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[getServerDbClient] Session loaded:', !!session, 'User:', session?.user?.id || 'none');
+  }
+
+  return client;
 }

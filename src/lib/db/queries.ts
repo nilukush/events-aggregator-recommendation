@@ -248,7 +248,18 @@ export async function upsertUserPreferences(
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    // Log detailed error for debugging
+    console.error('[upsertUserPreferences] Database error:', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      userId,
+      preferences,
+    });
+    throw error;
+  }
   return data;
 }
 
