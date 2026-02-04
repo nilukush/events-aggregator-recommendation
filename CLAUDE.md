@@ -259,11 +259,15 @@ npm run test:watch       # Watch mode for tests
 - **City Display**: Events now show city badges based on coordinates (40+ cities supported)
 - **Simplified Navigation**: Removed redundant nav links for cleaner UX
 - **City Detection Priority**: Coordinates are now checked first for city badges (more accurate), falling back to location name parsing
+- **Debug Endpoint**: Enhanced `/api/debug/events` to return user preferences and recommendations for troubleshooting
 
 ### Bug Fixes (Jan 2026)
 - **Duplicate Header Fixed**: Removed duplicate `<Header />` from account page - now uses global header from root layout only
 - **Personalization Indicators Fixed**: Added `match_score` and `match_reasons` fields to `Event` interface in `PersonalizedEventList.tsx` - recommendation scores now display correctly on event cards when authenticated
 - **City Badge Accuracy**: Improved city detection by prioritizing coordinate-based lookup over text parsing (fixes false positives like "Bangalore" on Dubai events)
+- **Coordinate Fallback Fixed**: Removed automatic coordinate assignment from scraper filter - prevents incorrect coordinates (e.g., Berlin) from being assigned to Dubai events during scraping
+- **Location Radius Filter**: Added hard location filter when recommendations are enabled - users now only see events within their specified radius (e.g., 100km around Dubai)
+- **Shared Distance Utility**: Extracted Haversine distance calculation to `location.ts` for reuse across RecommendationEngine and Events API
 
 ### Personalization System
 - **Recommendation Engine**: Content-based filtering with 4 factors:
@@ -273,7 +277,8 @@ npm run test:watch       # Watch mode for tests
   - Event timing (10%): Prioritizes upcoming events (1-7 days optimal)
 - **Min Score Threshold**: 0.1 (includes events with weak matches)
 - **Max Recommendations**: 50 events per request
-- **Smart Filtering**: Skips hard filters when recommendations enabled, uses scoring instead
+- **Hard Location Filter**: When user has location preferences set, only events within their radius are shown (applied AFTER recommendation scoring)
+- **Debug Logging**: Development mode logs recommendation count, location filter stats, and scoring details
 
 ### How Personalization Works
 

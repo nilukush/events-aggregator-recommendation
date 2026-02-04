@@ -336,7 +336,13 @@ export abstract class WebScraperPlugin extends BaseEventSourcePlugin {
 
   /**
    * Parse location with fallback to filter coordinates
-   * When scraping doesn't provide coordinates, use the search location
+   *
+   * IMPORTANT: We NO LONGER assign filter coordinates to events without coordinates.
+   * This was causing incorrect city badges (e.g., "Berlin" on Dubai events).
+   *
+   * Previous behavior: If scraping with ?city=Berlin, ALL events got Berlin coordinates.
+   * New behavior: If coordinates aren't found during parsing, leave them as null.
+   * The city badge will fall back to text-based extraction from location_name.
    */
   protected parseLocationWithFilters(
     locationStr?: string,
@@ -344,14 +350,23 @@ export abstract class WebScraperPlugin extends BaseEventSourcePlugin {
   ): NormalizedEvent["location"] {
     const baseLocation = this.parseLocation(locationStr);
 
-    // If we have filter coordinates and the parsed location doesn't have coordinates,
-    // use the filter coordinates as the event location
+    // NOTE: We intentionally do NOT assign filter coordinates as fallback anymore.
+    // This prevents incorrect coordinates from being assigned to events.
+    // Better to have no coordinates than wrong coordinates.
+    //
+    // If the event doesn't have coordinates from the source, we keep lat/lng as null.
+    // The city badge will fall back to extracting the city name from location_name.
+
+    // Log when coordinates would have been assigned (for debugging)
     if (filters && filters.location?.lat && filters.location?.lng && !baseLocation.lat) {
-      return {
-        ...baseLocation,
-        lat: filters.location.lat,
-        lng: filters.location.lng,
-      };
+      // Coordinates are available from filters but NOT assigned to avoid wrong data
+      // The location_name should contain the city name for text-based extraction
+      if (process.env.NODE_ENV === 'development') {
+        console.debug(
+          `[WebScraperPlugin] NOT assigning filter coordinates (${filters.location.lat}, ${filters.location.lng}) ` +
+          `to event. Location name "${baseLocation.name}" will be used for city extraction.`
+        );
+      }
     }
 
     return baseLocation;

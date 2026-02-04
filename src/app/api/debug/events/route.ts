@@ -1,15 +1,17 @@
 /**
- * Debug API Route - Show event statistics
+ * Debug API Route - Show event statistics and user data
  * GET /api/debug/events - Returns statistics about events in database
  */
 
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { TABLES } from "@/lib/db/schema";
+import { getServerUser } from "@/lib/auth/server-client";
 
 export async function GET() {
   try {
     const now = new Date().toISOString();
+    const user = await getServerUser();
 
     // Get total events count
     const { count: totalCount } = await supabase
@@ -28,12 +30,13 @@ export async function GET() {
       .select("*", { count: "exact", head: true })
       .lt("start_time", now);
 
-    // Get sample events (first 5)
+    // Get sample events with coordinates (first 10)
     const { data: sampleEvents } = await supabase
       .from(TABLES.EVENTS)
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(5);
+      .select("id, title, location_name, location_lat, location_lng, category, start_time")
+      .not("location_lat", "is", null)
+      .order("start_time", { ascending: true })
+      .limit(10);
 
     // Get events by source
     const { data: eventsData } = await supabase
@@ -60,6 +63,30 @@ export async function GET() {
       event_count: sourceCounts[s.id] || 0,
     }));
 
+    // Get user preferences and recommendations if authenticated
+    let userData = null;
+    if (user) {
+      const { data: prefs } = await supabase
+        .from(TABLES.USER_PREFERENCES)
+        .select("*")
+        .eq("user_id", user.id)
+        .single();
+
+      const { data: recommendations } = await supabase
+        .from(TABLES.RECOMMENDATIONS)
+        .select("*")
+        .eq("user_id", user.id)
+        .gte("expires_at", now)
+        .order("score", { ascending: false })
+        .limit(10);
+
+      userData = {
+        user_id: user.id,
+        preferences: prefs,
+        recommendations: recommendations || [],
+      };
+    }
+
     return NextResponse.json({
       success: true,
       data: {
@@ -71,6 +98,7 @@ export async function GET() {
         },
         sample_events: sampleEvents || [],
         events_by_source: sourceSummary || [],
+        user_data: userData,
       },
     });
   } catch (error) {

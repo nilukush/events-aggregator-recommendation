@@ -26,6 +26,7 @@ import type {
 } from "../db/schema";
 import { supabase } from "../supabase";
 import { TABLES } from "../db/schema";
+import { calculateDistance } from "../utils/location";
 
 // ============================================
 // Types
@@ -98,20 +99,8 @@ function calculateDistanceScore(
     return 0.5; // Neutral score for events without location
   }
 
-  // Haversine formula for distance calculation
-  const R = 6371; // Earth's radius in km
-  const dLat = toRad(event.location_lat - userLat);
-  const dLng = toRad(event.location_lng - userLng);
-
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(userLat)) *
-      Math.cos(toRad(event.location_lat)) *
-      Math.sin(dLng / 2) *
-      Math.sin(dLng / 2);
-
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const distance = R * c;
+  // Use shared distance calculation utility
+  const distance = calculateDistance(event.location_lat, event.location_lng, userLat, userLng);
 
   // Score based on distance
   if (distance <= radiusKm * 0.25) {
@@ -127,10 +116,6 @@ function calculateDistanceScore(
     return 0.3;
   }
   return 0.1; // Too far
-}
-
-function toRad(degrees: number): number {
-  return degrees * (Math.PI / 180);
 }
 
 /**

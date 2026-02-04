@@ -25,6 +25,8 @@ import type {
 } from "@/lib/api/types";
 import { isEventBookmarked, isEventHidden } from "@/lib/services/UserPreferencesService";
 import { getRecommendationsForUser } from "@/lib/services/RecommendationEngine";
+import { getUserPreferences } from "@/lib/db/queries";
+import { calculateDistance } from "@/lib/utils/location";
 
 /**
  * Parse query parameters from request URL
@@ -284,6 +286,11 @@ export async function GET(request: NextRequest) {
           excludeBookmarked: false,
         });
 
+        // Debug logging
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[Events API] Recommendations generated: ${recommendations.recommendations.length} events for user ${user.id}`);
+        }
+
         // Create score and reason maps for O(1) lookup
         recommendationScores = new Map(
           recommendations.recommendations.map(r => [r.event_id, r.score])
@@ -294,6 +301,50 @@ export async function GET(request: NextRequest) {
       } catch (error) {
         console.warn("Recommendation engine failed, using basic sorting:", error);
         // Fall back to basic filtering
+      }
+    }
+
+    // HARD LOCATION FILTER: After recommendation scoring, filter events beyond user's radius
+    // This ensures users only see events within their specified radius when preferences are set
+    if (useRecommendations && user) {
+      try {
+        const userPrefs = await getUserPreferences(user.id);
+        if (userPrefs &&
+            userPrefs.location_lat !== null &&
+            userPrefs.location_lng !== null) {
+          const userRadius = userPrefs.location_radius_km || 100;
+          const beforeCount = events.length;
+
+          // Filter events beyond user's radius
+          events = events.filter((event) => {
+            // Keep events without coordinates (can't determine distance)
+            if (!event.location_lat || !event.location_lng) {
+              return true;
+            }
+
+            // Calculate distance and check if within radius
+            // We've already checked that userPrefs values are not null
+            const distance = calculateDistance(
+              event.location_lat,
+              event.location_lng,
+              userPrefs.location_lat!,
+              userPrefs.location_lng!
+            );
+
+            return distance <= userRadius;
+          });
+
+          const afterCount = events.length;
+          if (process.env.NODE_ENV === 'development' && beforeCount > afterCount) {
+            console.log(
+              `[Events API] Location filter: ${beforeCount} → ${afterCount} events ` +
+              `(removed ${beforeCount - afterCount} events outside ${userRadius}km radius)`
+            );
+          }
+        }
+      } catch (error) {
+        console.warn("Failed to apply location filter:", error);
+        // Continue without location filter on error
       }
     }
 
