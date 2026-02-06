@@ -11,7 +11,7 @@ import { formatDistanceToNow } from "date-fns";
 import { CalendarIcon, MapPinIcon, ClockIcon, BookmarkIcon } from "@heroicons/react/24/outline";
 import { BookmarkIcon as BookmarkSolidIcon } from "@heroicons/react/24/solid";
 import type { DbEvent } from "@/lib/db/schema";
-import { extractCity, getCityFromCoordinates } from "@/lib/utils/location";
+import { getEventCity } from "@/lib/utils/location";
 
 export interface EventCardProps {
   event: {
@@ -52,14 +52,14 @@ export function EventCard({
   const endDate = event.end_time ? new Date(event.end_time) : null;
   const timeUntilEvent = formatDistanceToNow(eventDate, { addSuffix: true });
 
-  // Extract city from coordinates first (more accurate), then fall back to location name
-  let city = null;
-  if (event.location_lat && event.location_lng) {
-    city = getCityFromCoordinates(event.location_lat, event.location_lng);
-  }
-  if (!city) {
-    city = extractCity(event.location_name);
-  }
+  // Extract city from multiple sources in order of reliability:
+  // 1. Coordinates (most accurate), 2. Location name, 3. Event title (fallback)
+  const city = getEventCity(
+    event.location_name,
+    event.location_lat,
+    event.location_lng,
+    event.title
+  );
 
   const formatEventTime = (date: Date) => {
     return date.toLocaleTimeString("en-US", {

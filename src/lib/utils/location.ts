@@ -166,6 +166,91 @@ export function extractCity(locationName: string | null): string | null {
 }
 
 /**
+ * Extract city name from event title
+ * This is used as a fallback when coordinates are not available
+ * and location_name doesn't contain a recognizable city
+ */
+export function extractCityFromTitle(title: string | null): string | null {
+  if (!title) return null;
+
+  const titleLower = title.toLowerCase();
+
+  // Try to find a known city in the title
+  for (const city of KNOWN_CITIES) {
+    // Match city name as a whole word in the title
+    const regex = new RegExp(`\\b${city.toLowerCase()}\\b`, 'i');
+    if (regex.test(titleLower)) {
+      return city;
+    }
+  }
+
+  // Special handling for multi-word cities that might be in different formats
+  const multiWordCities: Record<string, string[]> = {
+    "Abu Dhabi": ["abu dhabi", "abudhabi"],
+    "New York": ["new york", "nyc", "new york city"],
+    "San Francisco": ["san francisco", "sf", "san fran"],
+    "Los Angeles": ["los angeles", "la", "l.a."],
+    "Kuwait City": ["kuwait city", "kuwait"],
+    "Hong Kong": ["hong kong", "hkg"],
+    "Sri Lanka": ["sri lanka"],
+    "South Africa": ["south africa", "sa"],
+    "Las Vegas": ["las vegas", "vegas"],
+    "New Delhi": ["new delhi", "delhi ncr"],
+  };
+
+  for (const [cityName, variants] of Object.entries(multiWordCities)) {
+    for (const variant of variants) {
+      if (titleLower.includes(variant)) {
+        return cityName;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Get city name for an event
+ * Tries multiple sources in order of reliability:
+ * 1. Coordinates (most accurate)
+ * 2. Location name
+ * 3. Event title (fallback)
+ */
+export function getEventCity(
+  locationName: string | null,
+  locationLat: number | null,
+  locationLng: number | null,
+  title: string | null
+): string | null {
+  // First try: coordinates
+  if (locationLat !== null && locationLng !== null) {
+    const cityFromCoords = getCityFromCoordinates(locationLat, locationLng);
+    if (cityFromCoords) {
+      return cityFromCoords;
+    }
+  }
+
+  // Second try: location name
+  if (locationName) {
+    const cityFromLocation = extractCity(locationName);
+    if (cityFromLocation) {
+      return cityFromLocation;
+    }
+  }
+
+  // Third try: event title (last resort)
+  // Only use this if the title clearly contains a city name
+  if (title) {
+    const cityFromTitle = extractCityFromTitle(title);
+    if (cityFromTitle) {
+      return cityFromTitle;
+    }
+  }
+
+  return null;
+}
+
+/**
  * Check if an event is virtual/online
  */
 export function isVirtualEvent(locationName: string | null, isVirtual: boolean): boolean {

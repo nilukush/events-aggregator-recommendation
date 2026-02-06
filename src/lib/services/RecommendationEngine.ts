@@ -27,6 +27,8 @@ import type {
 import { supabase } from "../supabase";
 import { TABLES } from "../db/schema";
 import { calculateDistance } from "../utils/location";
+import { getServerDbClient } from "../db/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 // ============================================
 // Types
@@ -543,8 +545,10 @@ export async function getRecommendationsForUser(
     expires_at: expiresAt.toISOString(),
   }));
 
-  // Upsert recommendations
-  await upsertRecommendations(recommendations);
+  // Upsert recommendations using server client with auth context
+  // This is critical for RLS policies to work correctly
+  const serverClient = await getServerDbClient();
+  await upsertRecommendations(recommendations, serverClient);
 
   // Fetch with events
   const withEvents = await getRecommendationsWithEvents(userId);

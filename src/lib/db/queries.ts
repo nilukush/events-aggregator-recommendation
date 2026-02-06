@@ -340,11 +340,13 @@ export async function getRecommendationsWithEvents(userId: string): Promise<
 }
 
 export async function upsertRecommendations(
-  recommendations: DbRecommendationInsert[]
+  recommendations: DbRecommendationInsert[],
+  client?: SupabaseClient
 ): Promise<DbRecommendation[]> {
   if (recommendations.length === 0) return [];
 
-  const { data, error } = await supabase
+  const db = client || supabase;
+  const { data, error } = await db
     .from(TABLES.RECOMMENDATIONS)
     .upsert(recommendations, {
       onConflict: "user_id,event_id",
@@ -352,7 +354,17 @@ export async function upsertRecommendations(
     })
     .select();
 
-  if (error) throw error;
+  if (error) {
+    // Log detailed error for debugging
+    console.error('[upsertRecommendations] Database error:', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      recommendationsCount: recommendations.length,
+    });
+    throw error;
+  }
   return data || [];
 }
 
