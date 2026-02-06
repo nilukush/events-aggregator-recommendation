@@ -152,8 +152,19 @@ Cached recommendation scores for personalized feeds
 - **PostGIS extension**: Enabled for accurate geospatial queries using WGS84 ellipsoid
 - **Geospatial queries**: Using `ST_DWithin()` and `ST_Distance()` for nearby events
 - **GiST indexes**: On geography columns for performant spatial queries
-- **Row Level Security**: Enabled on user tables
+- **Row Level Security**: Enabled on user tables with INSERT/UPDATE/DELETE policies
 - **Triggers**: Auto-update updated_at timestamps
+
+### Migrations
+
+Run migrations in order:
+
+```bash
+# 001: Initial schema (events, user_preferences, user_interactions, recommendations)
+# 002: Add RLS policies for recommendations table (PostgreSQL 14 compatible)
+# 003: Cleanup incorrect event coordinates
+# 004: Fix incorrect location_name values
+```
 
 ## Database Setup Instructions
 
@@ -268,6 +279,14 @@ npm run test:watch       # Watch mode for tests
 - **Coordinate Fallback Fixed**: Removed automatic coordinate assignment from scraper filter - prevents incorrect coordinates (e.g., Berlin) from being assigned to Dubai events during scraping
 - **Location Radius Filter**: Added hard location filter when recommendations are enabled - users now only see events within their specified radius (e.g., 100km around Dubai)
 - **Shared Distance Utility**: Extracted Haversine distance calculation to `location.ts` for reuse across RecommendationEngine and Events API
+
+### Bug Fixes (Feb 2026)
+- **RLS Policies for Recommendations**: Added missing INSERT/UPDATE/DELETE policies on recommendations table (migration 002)
+- **Auth Context for Recommendations**: Fixed `upsertRecommendations()` to use server client with auth context - RLS policies now work correctly
+- **Coordinate Cleanup**: Migration 003 nullifies incorrect coordinates that don't match city names in event titles
+- **Location Name Cleanup**: Migration 004 removes incorrect city names from `location_name` based on language detection
+- **City Badge Fallback**: Added `getEventCity()` function with multi-source fallback (coordinates → location_name → title)
+- **City from Title Extraction**: Added `extractCityFromTitle()` for events without coordinates or reliable location_name
 
 ### Personalization System
 - **Recommendation Engine**: Content-based filtering with 4 factors:
