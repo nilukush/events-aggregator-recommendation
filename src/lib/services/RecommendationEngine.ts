@@ -167,6 +167,7 @@ function calculateDayTimeScore(
 
 /**
  * Calculate interest match score
+ * Enhanced to match against tags, category, title, AND description
  */
 function calculateInterestScore(
   event: DbEvent,
@@ -178,20 +179,34 @@ function calculateInterestScore(
 
   const eventTags = event.tags || [];
   const eventCategory = event.category?.toLowerCase() || "";
+  const eventTitle = event.title?.toLowerCase() || "";
+  const eventDescription = event.description?.toLowerCase() || "";
 
   let matches = 0;
   for (const interest of userInterests) {
     const interestLower = interest.toLowerCase();
+
+    // Match against tags (exact match)
     if (eventTags.some((tag) => tag.toLowerCase() === interestLower)) {
-      matches++;
+      matches += 2; // Higher weight for exact tag matches
     }
+    // Match against category (contains)
     if (eventCategory.includes(interestLower)) {
       matches++;
+    }
+    // Match against title (contains)
+    if (eventTitle.includes(interestLower)) {
+      matches++;
+    }
+    // Match against description (contains)
+    if (eventDescription.includes(interestLower)) {
+      matches += 0.5; // Lower weight for description matches
     }
   }
 
   // Score based on number of matches (normalized)
-  return Math.min(1, 0.3 + matches * 0.35);
+  // Base score of 0.3, plus matches * 0.15 (adjusted for higher match counts)
+  return Math.min(1, 0.3 + matches * 0.15);
 }
 
 // ============================================
@@ -212,9 +227,23 @@ async function contentBasedFiltering(
 
   const scores: RecommendationScore[] = [];
 
+  // Debug logging in development
+  const isDev = process.env.NODE_ENV === 'development';
+  if (isDev) {
+    console.log(`[RecommendationEngine] Content-based filtering for user ${userId}`);
+    console.log(`[RecommendationEngine] User interests:`, preferences.interests);
+    console.log(`[RecommendationEngine] User location:`, preferences.location_lat, preferences.location_lng);
+    console.log(`[RecommendationEngine] Total events to score:`, events.length);
+    console.log(`[RecommendationEngine] Already seen events:`, seenEventIds.size);
+  }
+
+  let scoredCount = 0;
+  let skippedCount = 0;
+
   for (const event of events) {
     // Skip if already seen and excludeSeen is true
     if (options.excludeSeen && seenEventIds.has(event.id)) {
+      skippedCount++;
       continue;
     }
 
@@ -275,11 +304,22 @@ async function contentBasedFiltering(
         reason: reasons.length > 0 ? reasons.join(", ") : "recommended for you",
         algorithm: "content-based",
       });
+      scoredCount++;
+    }
+
+    // Log first few events for debugging
+    if (isDev && scoredCount <= 3) {
+      console.log(`[RecommendationEngine] Event: "${event.title.substring(0, 40)}..." - Score: ${finalScore.toFixed(3)} (${reasons.join(', ') || 'no specific reason'})`);
     }
   }
 
   // Sort by score descending
   scores.sort((a, b) => b.score - a.score);
+
+  if (isDev) {
+    console.log(`[RecommendationEngine] Generated ${scores.length} recommendations (skipped ${skippedCount} seen events)`);
+    console.log(`[RecommendationEngine] Top score: ${scores[0]?.score.toFixed(3)}, Bottom score: ${scores[scores.length - 1]?.score.toFixed(3)}`);
+  }
 
   return scores.slice(0, options.limit || 50); // Increase from 20 to 50
 }
@@ -498,6 +538,17 @@ export async function getRecommendationsForUser(
   const preferences = await getUserPreferences(userId);
   const scores: RecommendationScore[] = [];
 
+  const isDev = process.env.NODE_ENV === 'development';
+  if (isDev) {
+    console.log(`[RecommendationEngine] Generating recommendations for user ${userId}`);
+    console.log(`[RecommendationEngine] Algorithm: ${algorithm}, Force refresh: ${forceRefresh}`);
+    console.log(`[RecommendationEngine] Preferences found:`, !!preferences);
+    if (preferences) {
+      console.log(`[RecommendationEngine] User interests:`, preferences.interests);
+      console.log(`[RecommendationEngine] User location:`, preferences.location_lat, preferences.location_lng);
+    }
+  }
+
   if (algorithm === "hybrid" && preferences) {
     const hybridScores = await hybridFiltering(userId, preferences, options);
     scores.push(...hybridScores);
@@ -512,6 +563,9 @@ export async function getRecommendationsForUser(
     } else {
       // No preferences, just get upcoming events
       const events = await getEvents();
+      if (isDev) {
+        console.log(`[RecommendationEngine] No preferences found, using fallback (upcoming events)`);
+      }
       for (const event of events.slice(0, limit || 20)) {
         scores.push({
           eventId: event.id,
@@ -521,6 +575,10 @@ export async function getRecommendationsForUser(
         });
       }
     }
+  }
+
+  if (isDev) {
+    console.log(`[RecommendationEngine] Total scores generated: ${scores.length}`);
   }
 
   // If no scores, return empty
